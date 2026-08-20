@@ -274,40 +274,44 @@ export default function HomeScreen() {
         const isAlmost = !!(hasProfile && !d.match.eligible && d.match.criteria.length > 0 && unmetCount === 1);
         const isSaved = savedIds.has(d.id);
         return (
-          <Link key={d.id} href={`/deadline/${d.id}`} asChild>
-            <Pressable style={styles.deadlineCard}>
-              <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
-                <Text style={[styles.ddayText, { color: dstyle.text }]}>{d.dday}</Text>
-              </View>
-              <View style={styles.deadlineInfo}>
-                <View style={styles.deadlineTopRow}>
-                  <Text style={[styles.deadlineCat, { color: catColor }]}>{d.category}</Text>
-                  {hasProfile && (
-                    <Text
-                      style={[
-                        styles.matchBadge,
-                        !d.match.eligible && styles.matchBadgeFail,
-                        isAlmost && styles.matchBadgeAlmost,
-                      ]}>
-                      {d.match.eligible
-                        ? '지원 가능'
-                        : isAlmost
-                          ? '조건 1개만 더 맞으면'
-                          : '조건 미충족'}
-                    </Text>
-                  )}
+          // 하트 버튼을 카드(Link/Pressable) "안"에 중첩시키지 않고 밖에 별도로 얹음
+          // — 중첩 Pressable이 가끔 터치를 동시에 가로채면서 화면이 튀는 현상이 있었음
+          <View key={d.id} style={styles.deadlineCardWrap}>
+            <Link href={`/deadline/${d.id}`} asChild>
+              <Pressable style={styles.deadlineCard}>
+                <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
+                  <Text style={[styles.ddayText, { color: dstyle.text }]}>{d.dday}</Text>
                 </View>
-                <Text style={styles.deadlineTitle}>{d.title}</Text>
-                <Text style={styles.deadlineMeta}>{d.meta}</Text>
-              </View>
-              <Pressable
-                onPress={() => toggleSaved(d.id)}
-                hitSlop={10}
-                style={styles.heartButton}>
-                <Text style={styles.heartIcon}>{isSaved ? '❤️' : '🤍'}</Text>
+                <View style={styles.deadlineInfo}>
+                  <View style={styles.deadlineTopRow}>
+                    <Text style={[styles.deadlineCat, { color: catColor }]}>{d.category}</Text>
+                    {hasProfile && (
+                      <Text
+                        style={[
+                          styles.matchBadge,
+                          !d.match.eligible && styles.matchBadgeFail,
+                          isAlmost && styles.matchBadgeAlmost,
+                        ]}>
+                        {d.match.eligible
+                          ? '지원 가능'
+                          : isAlmost
+                            ? '조건 1개만 더 맞으면'
+                            : '조건 미충족'}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={styles.deadlineTitle}>{d.title}</Text>
+                  <Text style={styles.deadlineMeta}>{d.meta}</Text>
+                </View>
               </Pressable>
+            </Link>
+            <Pressable
+              onPress={() => toggleSaved(d.id)}
+              hitSlop={10}
+              style={styles.heartButton}>
+              <Text style={styles.heartIcon}>{isSaved ? '❤️' : '🤍'}</Text>
             </Pressable>
-          </Link>
+          </View>
         );
       })}
 
@@ -480,6 +484,7 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: COLORS.inkSoft },
   chipTextActive: { color: '#FFFFFF', fontWeight: '600' },
 
+  deadlineCardWrap: { position: 'relative', marginBottom: 10 },
   deadlineCard: {
     flexDirection: 'row',
     gap: 12,
@@ -488,7 +493,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
     borderRadius: 14,
     padding: 14,
-    marginBottom: 10,
+    paddingRight: 36,
   },
   ddayBadge: { borderRadius: 8, paddingVertical: 5, paddingHorizontal: 9, alignSelf: 'flex-start' },
   ddayText: { fontWeight: '700', fontSize: 13 },
@@ -502,7 +507,7 @@ const styles = StyleSheet.create({
   deadlineMeta: { fontSize: 11.5, color: COLORS.inkSoft, marginTop: 4 },
   emptyText: { fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 },
 
-  heartButton: { paddingHorizontal: 4, paddingVertical: 2, alignSelf: 'flex-start' },
+  heartButton: { position: 'absolute', top: 10, right: 10, padding: 4 },
   heartIcon: { fontSize: 16 },
 
   matchBanner: {
