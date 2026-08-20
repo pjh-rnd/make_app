@@ -3,15 +3,9 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 
-import { HeaderBackButton } from '@/components/header-back-button';
-
 export const unstable_settings = {
   anchor: '(tabs)',
 };
-
-// edit-profile 헤더 옵션 — 컴포넌트 밖에 고정해서, 렌더링마다 새 객체/함수가 생겨 navigator가
-// "옵션이 바뀌었다"고 오인하는 일이 없게 함
-const EDIT_PROFILE_OPTIONS = { title: '마이페이지', headerLeft: () => <HeaderBackButton /> };
 
 export default function RootLayout() {
   // 화면 본문(COLORS)이 아직 라이트 팔레트로 고정돼 있어서, 시스템 다크모드를 그대로 따라가면
@@ -22,7 +16,9 @@ export default function RootLayout() {
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="edit-profile" options={EDIT_PROFILE_OPTIONS} />
+        {/* 네이티브 헤더 대신 화면 안에서 직접 뒤로가기+제목을 그림 (iOS가 헤더 버튼에 자동으로
+            씌우는 원형 배경이 계속 깜빡이는 문제가 있어서, 네이티브 헤더 자체를 안 씀) */}
+        <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />

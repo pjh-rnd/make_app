@@ -21,6 +21,7 @@ export default function DeadlineDetailScreen() {
   if (!item) {
     return (
       <View style={styles.screen}>
+        <ScreenHeader title="정책 상세" />
         <Text style={styles.notFound}>해당 정책을 찾을 수 없어요.</Text>
       </View>
     );
@@ -31,9 +32,11 @@ export default function DeadlineDetailScreen() {
   const match = calculateMatch(profile, item.requirements);
 
   return (
-    <>
-      {/* 상단 헤더 제목을 카테고리명으로 지정 */}
-      <Stack.Screen options={{ title: item.category, headerLeft: () => <HeaderBackButton /> }} />
+    <View style={styles.screen}>
+      {/* 네이티브 헤더 대신 화면 안에서 직접 그림 (iOS가 헤더 버튼에 씌우는 원형 배경이 계속
+          깜빡이는 문제가 있어서 — app/_layout.tsx에서 이 화면은 headerShown: false로 처리해둠) */}
+      <Stack.Screen options={{ headerShown: false }} />
+      <ScreenHeader title={item.category} />
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <View style={styles.topRow}>
           <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
@@ -66,13 +69,33 @@ export default function DeadlineDetailScreen() {
           </Text>
         ))}
       </ScrollView>
-    </>
+    </View>
+  );
+}
+
+// 네이티브 헤더 대신 화면 안에서 직접 그리는 헤더 (뒤로가기 + 카테고리명)
+function ScreenHeader({ title }: { title: string }) {
+  return (
+    <View style={styles.header}>
+      <HeaderBackButton />
+      <Text style={styles.headerTitle}>{title}</Text>
+      <View style={styles.headerSpacer} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.paper },
-  content: { padding: 20, paddingTop: 24, paddingBottom: 40 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 56,
+    paddingBottom: 12,
+    paddingHorizontal: 12,
+  },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: COLORS.ink },
+  headerSpacer: { width: 40 },
+  content: { padding: 20, paddingTop: 4, paddingBottom: 40 },
   notFound: { fontSize: 14, color: COLORS.inkSoft, padding: 20 },
 
   topRow: {

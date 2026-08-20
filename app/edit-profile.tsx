@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { HeaderBackButton } from '@/components/header-back-button';
 import { COLORS } from '@/constants/moa-colors';
 import { supabase } from '@/lib/supabase';
 import { HOUSEHOLD_COPY_MAP, SECTIONS } from '@/lib/profileFields';
@@ -141,8 +142,11 @@ export default function EditProfileScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={COLORS.ink} />
+      <View style={styles.screen}>
+        <ScreenHeader />
+        <View style={styles.center}>
+          <ActivityIndicator color={COLORS.ink} />
+        </View>
       </View>
     );
   }
@@ -151,6 +155,7 @@ export default function EditProfileScreen() {
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScreenHeader />
       <ScrollView contentContainerStyle={styles.content}>
         {SECTIONS.map((section) => {
           const expanded = expandedTitles.has(section.title);
@@ -243,8 +248,28 @@ export default function EditProfileScreen() {
   );
 }
 
+// 네이티브 헤더 대신 화면 안에서 직접 그리는 헤더 (뒤로가기 + 제목)
+function ScreenHeader() {
+  return (
+    <View style={styles.header}>
+      <HeaderBackButton />
+      <Text style={styles.headerTitle}>마이페이지</Text>
+      <View style={styles.headerSpacer} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.paper },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 56,
+    paddingBottom: 12,
+    paddingHorizontal: 12,
+  },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: COLORS.ink },
+  headerSpacer: { width: 40 },
   center: { flex: 1, backgroundColor: COLORS.paper, justifyContent: 'center', alignItems: 'center' },
   content: { padding: 20 },
 
