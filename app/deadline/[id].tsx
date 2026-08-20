@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { HeaderBackButton } from '@/components/header-back-button';
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { DEADLINES } from '@/data/deadlines';
 import { calculateMatch } from '@/lib/matching';
@@ -32,7 +33,7 @@ export default function DeadlineDetailScreen() {
   return (
     <>
       {/* 상단 헤더 제목을 카테고리명으로 지정 */}
-      <Stack.Screen options={{ title: item.category }} />
+      <Stack.Screen options={{ title: item.category, headerLeft: () => <HeaderBackButton /> }} />
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <View style={styles.topRow}>
           <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
