@@ -8,7 +8,7 @@ import { DEADLINES } from '@/data/deadlines';
 import { calculateMatch } from '@/lib/matching';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { supabase } from '@/lib/supabase';
-import { useProfile } from '@/lib/useProfile';
+import { calculateAge, useProfile } from '@/lib/useProfile';
 import { useSession } from '@/lib/useSession';
 
 // 칩의 "초기값"일 뿐, 실제 켜짐/꺼짐 상태는 컴포넌트 안 useState가 들고 있음
@@ -100,7 +100,24 @@ export default function HomeScreen() {
     }, [refreshProfile, refreshSaved])
   );
 
-  const hasProfile = !!profile && (profile.age || profile.region || profile.income_level || profile.housing_status);
+  const hasProfile =
+    !!profile &&
+    (profile.birth_date ||
+      profile.region_province ||
+      profile.personal_monthly_income != null ||
+      profile.owns_house != null);
+
+  // "내 조건" 카드에 보여줄 요약 텍스트 — 26개 필드 중 대표적인 4개만 추려서 보여줌
+  const profileAge = calculateAge(profile?.birth_date);
+  const profileRegionText = [profile?.region_province, profile?.region_city, profile?.region_district]
+    .filter(Boolean)
+    .join(' ');
+  const profileIncomeText =
+    profile?.personal_monthly_income != null
+      ? `월 ${Math.round(profile.personal_monthly_income / 10000).toLocaleString()}만원`
+      : '미입력';
+  const profileHousingText =
+    profile?.owns_house == null ? '미입력' : profile.owns_house ? '주택 보유' : '무주택';
 
   // interests가 "state" — 값이 바뀌면 이 값을 쓰는 화면 부분이 자동으로 다시 그려짐
   const [interests, setInterests] = useState(INITIAL_INTERESTS);
@@ -179,10 +196,10 @@ export default function HomeScreen() {
           <Text style={styles.profileEmptyText}>불러오는 중...</Text>
         ) : hasProfile ? (
           <>
-            <ProfileRow label="나이" value={profile?.age ? `${profile.age}세` : '미입력'} />
-            <ProfileRow label="지역" value={profile?.region || '미입력'} />
-            <ProfileRow label="소득" value={profile?.income_level || '미입력'} />
-            <ProfileRow label="주거" value={profile?.housing_status || '미입력'} last />
+            <ProfileRow label="나이" value={profileAge != null ? `${profileAge}세` : '미입력'} />
+            <ProfileRow label="지역" value={profileRegionText || '미입력'} />
+            <ProfileRow label="소득" value={profileIncomeText} />
+            <ProfileRow label="주거" value={profileHousingText} last />
           </>
         ) : (
           <Text style={styles.profileEmptyText}>
