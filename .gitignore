@@ -34,6 +34,9 @@ yarn-error.*
 .env*.local
 .env
 
+# personal notes, not for public repo
+IDEAS.md
+
 # typescript
 *.tsbuildinfo
 

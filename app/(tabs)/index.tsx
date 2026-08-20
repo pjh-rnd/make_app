@@ -1,11 +1,12 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { DEADLINES } from '@/data/deadlines';
 import { calculateMatch } from '@/lib/matching';
+import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/lib/useProfile';
 import { useSession } from '@/lib/useSession';
@@ -59,12 +60,34 @@ function buildMonthGrid(year: number, month: number) {
 
 export default function HomeScreen() {
   const today = new Date();
-  const weeks = buildMonthGrid(2026, 7); // 7 = 8월 (0부터 시작이라 -1)
+
+  // 달력에 보여줄 연/월. 처음엔 오늘 날짜 기준으로 시작하고, 화살표로 이전/다음 달 이동 가능
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const weeks = buildMonthGrid(viewYear, viewMonth);
+
+  function goToPrevMonth() {
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  }
+  function goToNextMonth() {
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  }
 
   const { session } = useSession();
   const { profile, loading: profileLoading, refresh: refreshProfile } = useProfile(
     session?.user.id
   );
+  const { savedIds, toggle: toggleSaved } = useSavedPolicies(session?.user.id);
 
   // 이 화면에 다시 돌아올 때마다(수정 화면에서 뒤로 왔을 때 등) 최신 프로필을 다시 불러옴
   useFocusEffect(
@@ -77,6 +100,8 @@ export default function HomeScreen() {
 
   // interests가 "state" — 값이 바뀌면 이 값을 쓰는 화면 부분이 자동으로 다시 그려짐
   const [interests, setInterests] = useState(INITIAL_INTERESTS);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
 
   // 특정 칩을 눌렀을 때, 그 칩의 active만 반대로 뒤집은 새 배열로 교체
   function toggleInterest(id: string) {
@@ -87,8 +112,18 @@ export default function HomeScreen() {
 
   // 켜져있는 칩들의 id 목록
   const activeIds = interests.filter((item) => item.active).map((item) => item.id);
-  // 그 중 하나라도 해당하는 마감만 남김
-  const filteredDeadlines = DEADLINES.filter((d) => activeIds.includes(d.categoryId));
+  const trimmedQuery = searchQuery.trim();
+
+  // 관심분야 → 검색어 → 찜한 것만 순서로 좁혀나감
+  const filteredDeadlines = DEADLINES.filter((d) => activeIds.includes(d.categoryId))
+    .filter(
+      (d) =>
+        trimmedQuery === '' ||
+        d.title.includes(trimmedQuery) ||
+        d.category.includes(trimmedQuery) ||
+        d.meta.includes(trimmedQuery)
+    )
+    .filter((d) => !showSavedOnly || savedIds.has(d.id));
 
   // 각 마감일마다 내 프로필과 비교해서 자격 여부 계산, 그 중 실제로 지원 가능한 것 하나를 배너에 띄움
   const deadlinesWithMatch = filteredDeadlines.map((d) => ({
@@ -96,6 +131,16 @@ export default function HomeScreen() {
     match: calculateMatch(profile, d.requirements),
   }));
   const bestMatch = deadlinesWithMatch.find((d) => d.match.eligible) ?? null;
+  // 딱 맞는 게 없을 때, 조건이 제일 적게 모자란(=가장 아깝게 놓친) 정책을 하나 골라서 보여줌
+  const nearMissCandidates = deadlinesWithMatch.filter((d) => d.match.criteria.length > 0);
+  const nearMiss =
+    !bestMatch && nearMissCandidates.length > 0
+      ? [...nearMissCandidates].sort(
+          (a, b) =>
+            a.match.criteria.filter((c) => !c.met).length -
+            b.match.criteria.filter((c) => !c.met).length
+        )[0]
+      : null;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -130,6 +175,15 @@ export default function HomeScreen() {
         <Text style={styles.logoutButtonText}>로그아웃</Text>
       </Pressable>
 
+      {/* 검색 */}
+      <TextInput
+        style={styles.searchInput}
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="정책 제목·카테고리 검색"
+        placeholderTextColor="#B6B0A0"
+      />
+
       {/* 관심 분야 칩 */}
       <Text style={styles.sectionLabel}>관심 분야</Text>
       <View style={styles.chipRow}>
@@ -143,10 +197,25 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         ))}
+        <Pressable
+          onPress={() => setShowSavedOnly((v) => !v)}
+          style={[styles.chip, showSavedOnly && styles.chipActive]}>
+          <Text style={[styles.chipText, showSavedOnly && styles.chipTextActive]}>
+            🤍 찜한 것만
+          </Text>
+        </Pressable>
       </View>
 
       {/* 달력 */}
-      <Text style={styles.sectionLabel}>2026년 8월</Text>
+      <View style={styles.calendarHeaderRow}>
+        <Pressable onPress={goToPrevMonth} hitSlop={8} style={styles.monthNavButton}>
+          <Text style={styles.monthNavText}>‹</Text>
+        </Pressable>
+        <Text style={styles.sectionLabel}>{viewYear}년 {viewMonth + 1}월</Text>
+        <Pressable onPress={goToNextMonth} hitSlop={8} style={styles.monthNavButton}>
+          <Text style={styles.monthNavText}>›</Text>
+        </Pressable>
+      </View>
       <View style={styles.calendar}>
         <View style={styles.weekdayRow}>
           {WEEKDAYS.map((w) => (
@@ -159,8 +228,8 @@ export default function HomeScreen() {
               const isToday =
                 cell.inMonth &&
                 cell.day === today.getDate() &&
-                today.getMonth() === 7 &&
-                today.getFullYear() === 2026;
+                viewMonth === today.getMonth() &&
+                viewYear === today.getFullYear();
               const dots = cell.inMonth ? DEADLINE_DAYS[cell.day] : undefined;
               return (
                 <View key={ci} style={[styles.dayCell, isToday && styles.dayCellToday]}>
@@ -197,6 +266,9 @@ export default function HomeScreen() {
       {deadlinesWithMatch.map((d) => {
         const dstyle = ddayStyle(d.urgency);
         const catColor = CATEGORY_COLOR[d.categoryId];
+        const unmetCount = d.match.criteria.filter((c) => !c.met).length;
+        const isAlmost = !!(hasProfile && !d.match.eligible && d.match.criteria.length > 0 && unmetCount === 1);
+        const isSaved = savedIds.has(d.id);
         return (
           <Link key={d.id} href={`/deadline/${d.id}`} asChild>
             <Pressable style={styles.deadlineCard}>
@@ -207,14 +279,29 @@ export default function HomeScreen() {
                 <View style={styles.deadlineTopRow}>
                   <Text style={[styles.deadlineCat, { color: catColor }]}>{d.category}</Text>
                   {hasProfile && (
-                    <Text style={[styles.matchBadge, !d.match.eligible && styles.matchBadgeFail]}>
-                      {d.match.eligible ? '지원 가능' : '조건 미충족'}
+                    <Text
+                      style={[
+                        styles.matchBadge,
+                        !d.match.eligible && styles.matchBadgeFail,
+                        isAlmost && styles.matchBadgeAlmost,
+                      ]}>
+                      {d.match.eligible
+                        ? '지원 가능'
+                        : isAlmost
+                          ? '조건 1개만 더 맞으면'
+                          : '조건 미충족'}
                     </Text>
                   )}
                 </View>
                 <Text style={styles.deadlineTitle}>{d.title}</Text>
                 <Text style={styles.deadlineMeta}>{d.meta}</Text>
               </View>
+              <Pressable
+                onPress={() => toggleSaved(d.id)}
+                hitSlop={10}
+                style={styles.heartButton}>
+                <Text style={styles.heartIcon}>{isSaved ? '❤️' : '🤍'}</Text>
+              </Pressable>
             </Pressable>
           </Link>
         );
@@ -233,6 +320,18 @@ export default function HomeScreen() {
             {bestMatch.match.criteria.map((c) => (
               <Text key={c.label} style={styles.matchCriterion}>
                 ✓ {c.label}
+              </Text>
+            ))}
+          </>
+        ) : nearMiss ? (
+          <>
+            <Text style={styles.matchNum}>조금만 더 가까워요</Text>
+            <Text style={styles.matchDesc}>{nearMiss.title}</Text>
+            {nearMiss.match.criteria.map((c) => (
+              <Text
+                key={c.label}
+                style={[styles.matchCriterion, !c.met && styles.matchCriterionUnmet]}>
+                {c.met ? '✓' : '✗'} {c.label}
               </Text>
             ))}
           </>
@@ -310,6 +409,29 @@ const styles = StyleSheet.create({
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
 
+  searchInput: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: COLORS.ink,
+    backgroundColor: COLORS.paperRaise,
+    marginBottom: 20,
+  },
+
+  calendarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  monthNavButton: { paddingHorizontal: 10, paddingVertical: 2 },
+  monthNavText: { fontSize: 16, fontWeight: '700', color: COLORS.inkSoft },
+
   calendar: {
     backgroundColor: COLORS.paperRaise,
     borderWidth: 1,
@@ -370,10 +492,14 @@ const styles = StyleSheet.create({
   deadlineTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   matchBadge: { fontSize: 10.5, fontWeight: '700', color: COLORS.mint },
   matchBadgeFail: { color: COLORS.inkSoft },
+  matchBadgeAlmost: { color: COLORS.amber },
   deadlineCat: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   deadlineTitle: { fontSize: 14, fontWeight: '600', color: COLORS.ink, marginTop: 3 },
   deadlineMeta: { fontSize: 11.5, color: COLORS.inkSoft, marginTop: 4 },
   emptyText: { fontSize: 13, color: COLORS.inkSoft, marginBottom: 12 },
+
+  heartButton: { paddingHorizontal: 4, paddingVertical: 2, alignSelf: 'flex-start' },
+  heartIcon: { fontSize: 16 },
 
   matchBanner: {
     backgroundColor: COLORS.ink,
@@ -385,4 +511,5 @@ const styles = StyleSheet.create({
   matchPercent: { color: '#7BD8B0' },
   matchDesc: { fontSize: 12, color: '#B8C2DC', marginTop: 6, lineHeight: 18 },
   matchCriterion: { fontSize: 11.5, color: '#B8C2DC', marginTop: 4 },
+  matchCriterionUnmet: { color: '#E8A7A0' },
 });

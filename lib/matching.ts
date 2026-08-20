@@ -4,6 +4,7 @@ export type Requirements = {
   maxAge?: number;
   maxIncomePercent?: number; // 중위소득 몇% 이하까지 대상인지
   requiresNoHouse?: boolean;
+  regionKeyword?: string; // 프로필의 region 문자열에 이 단어가 포함돼야 함 (예: '서울', '관악')
 };
 
 export type MatchCriterion = { label: string; met: boolean };
@@ -39,6 +40,13 @@ export function calculateMatch(profile: Profile | null, requirements: Requiremen
     criteria.push({
       label: '무주택자',
       met: !!profile?.housing_status?.includes('무주택'),
+    });
+  }
+
+  if (requirements.regionKeyword) {
+    criteria.push({
+      label: `${requirements.regionKeyword} 거주`,
+      met: !!profile?.region?.includes(requirements.regionKeyword),
     });
   }
 

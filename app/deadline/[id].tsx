@@ -1,10 +1,11 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { DEADLINES } from '@/data/deadlines';
 import { calculateMatch } from '@/lib/matching';
 import { useProfile } from '@/lib/useProfile';
+import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { useSession } from '@/lib/useSession';
 
 export default function DeadlineDetailScreen() {
@@ -14,6 +15,7 @@ export default function DeadlineDetailScreen() {
 
   const { session } = useSession();
   const { profile } = useProfile(session?.user.id);
+  const { savedIds, toggle: toggleSaved } = useSavedPolicies(session?.user.id);
 
   if (!item) {
     return (
@@ -32,8 +34,15 @@ export default function DeadlineDetailScreen() {
       {/* 상단 헤더 제목을 카테고리명으로 지정 */}
       <Stack.Screen options={{ title: item.category }} />
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
-          <Text style={[styles.ddayText, { color: dstyle.text }]}>{item.dday}</Text>
+        <View style={styles.topRow}>
+          <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
+            <Text style={[styles.ddayText, { color: dstyle.text }]}>{item.dday}</Text>
+          </View>
+          {session && (
+            <Pressable onPress={() => toggleSaved(item.id)} hitSlop={10}>
+              <Text style={styles.heartIcon}>{savedIds.has(item.id) ? '❤️' : '🤍'}</Text>
+            </Pressable>
+          )}
         </View>
 
         <Text style={[styles.category, { color: catColor }]}>{item.category}</Text>
@@ -65,14 +74,20 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingTop: 24, paddingBottom: 40 },
   notFound: { fontSize: 14, color: COLORS.inkSoft, padding: 20 },
 
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
   ddayBadge: {
     borderRadius: 8,
     paddingVertical: 6,
     paddingHorizontal: 10,
     alignSelf: 'flex-start',
-    marginBottom: 14,
   },
   ddayText: { fontWeight: '700', fontSize: 14 },
+  heartIcon: { fontSize: 20 },
 
   category: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
   title: { fontSize: 20, fontWeight: '700', color: COLORS.ink, marginTop: 6, lineHeight: 27 },
