@@ -106,6 +106,12 @@ export default function HomeScreen() {
   const [interests, setInterests] = useState(INITIAL_INTERESTS);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSavedOnly, setShowSavedOnly] = useState(false);
+  // 캘린더에서 점(dot) 찍힌 날짜를 탭하면 그 날의 카테고리로 좁혀 보여줌. 같은 날 다시 탭하면 해제.
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+
+  function handleDayPress(day: number) {
+    setSelectedDay((prev) => (prev === day ? null : day));
+  }
 
   // 특정 칩을 눌렀을 때, 그 칩의 active만 반대로 뒤집은 새 배열로 교체
   function toggleInterest(id: string) {
@@ -127,7 +133,10 @@ export default function HomeScreen() {
         d.category.includes(trimmedQuery) ||
         d.meta.includes(trimmedQuery)
     )
-    .filter((d) => !showSavedOnly || savedIds.has(d.id));
+    .filter((d) => !showSavedOnly || savedIds.has(d.id))
+    .filter(
+      (d) => selectedDay === null || (DEADLINE_DAYS[selectedDay] ?? []).some((x) => x.category === d.categoryId)
+    );
 
   // 각 마감일마다 내 프로필과 비교해서 자격 여부 계산, 그 중 실제로 지원 가능한 것 하나를 배너에 띄움
   const deadlinesWithMatch = filteredDeadlines.map((d) => ({
@@ -235,8 +244,17 @@ export default function HomeScreen() {
                 viewMonth === today.getMonth() &&
                 viewYear === today.getFullYear();
               const dots = cell.inMonth ? DEADLINE_DAYS[cell.day] : undefined;
+              const isSelected = cell.inMonth && selectedDay === cell.day;
               return (
-                <View key={ci} style={[styles.dayCell, isToday && styles.dayCellToday]}>
+                <Pressable
+                  key={ci}
+                  disabled={!cell.inMonth || !dots}
+                  onPress={() => handleDayPress(cell.day)}
+                  style={[
+                    styles.dayCell,
+                    isToday && styles.dayCellToday,
+                    isSelected && styles.dayCellSelected,
+                  ]}>
                   <Text
                     style={[
                       styles.dayNum,
@@ -255,12 +273,19 @@ export default function HomeScreen() {
                       ))}
                     </View>
                   )}
-                </View>
+                </Pressable>
               );
             })}
           </View>
         ))}
       </View>
+      {selectedDay !== null && (
+        <Pressable onPress={() => setSelectedDay(null)} style={styles.selectedDayBanner}>
+          <Text style={styles.selectedDayBannerText}>
+            {viewMonth + 1}월 {selectedDay}일 마감만 보는 중 · 눌러서 해제
+          </Text>
+        </Pressable>
+      )}
 
       {/* 다가오는 마감 */}
       <Text style={styles.sectionLabel}>다가오는 마감</Text>
@@ -467,11 +492,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   dayCellToday: { backgroundColor: COLORS.mintSoft },
+  dayCellSelected: { borderWidth: 1.5, borderColor: COLORS.mint },
   dayNum: { fontSize: 12, color: COLORS.inkSoft },
   dayNumDim: { color: '#C7C2B4' },
   dayNumToday: { color: COLORS.mint, fontWeight: '700' },
   dotRow: { flexDirection: 'row', gap: 3, marginTop: 4 },
   dot: { width: 5, height: 5, borderRadius: 3 },
+  selectedDayBanner: {
+    backgroundColor: COLORS.mintSoft,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  selectedDayBannerText: { fontSize: 12, color: COLORS.mint, fontWeight: '600' },
   chip: {
     paddingVertical: 8,
     paddingHorizontal: 14,
