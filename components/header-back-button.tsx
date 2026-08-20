@@ -16,5 +16,5 @@ export function HeaderBackButton() {
 
 const styles = StyleSheet.create({
   button: { paddingRight: 14, paddingVertical: 4 },
-  arrow: { fontSize: 26, fontWeight: '600', color: COLORS.ink },
+  arrow: { fontSize: 36, fontWeight: '600', color: COLORS.ink },
 });
