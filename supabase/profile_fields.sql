@@ -10,8 +10,8 @@ alter table public.profiles
   add column if not exists region_city text,        -- 예: (광역시/도 산하 시·군, 특별시는 비워둘 수 있음)
   add column if not exists region_district text,    -- 예: 관악구
 
-  -- 개인 소득/자산
-  add column if not exists personal_monthly_income bigint,  -- 원 단위
+  -- 개인 소득/자산 (금액은 전부 만원 단위)
+  add column if not exists personal_monthly_income bigint,
   add column if not exists personal_assets bigint,
   add column if not exists owns_house boolean,
   add column if not exists owns_car boolean,
@@ -20,7 +20,7 @@ alter table public.profiles
   add column if not exists family_member_count integer,
   add column if not exists family_type text,  -- 예: 1인가구 / 부모동거 / 한부모가족 등 자유 입력
 
-  -- 가구 소득/자산
+  -- 가구 소득/자산 (금액은 전부 만원 단위)
   add column if not exists household_monthly_income bigint,
   add column if not exists household_assets bigint,
   add column if not exists household_owns_house boolean,
@@ -30,11 +30,11 @@ alter table public.profiles
   add column if not exists university_location text,
   add column if not exists income_base_location text,
   add column if not exists subscription_account_payment_count integer,
-  add column if not exists subscription_account_payment_amount bigint,
+  add column if not exists subscription_account_payment_amount bigint, -- 만원 단위
   add column if not exists subscription_account_payment_period integer, -- 개월 수
-  add column if not exists parents_income bigint,
-  add column if not exists parents_assets bigint,
-  add column if not exists parents_car_value bigint,
+  add column if not exists parents_income bigint, -- 만원 단위
+  add column if not exists parents_assets bigint, -- 만원 단위
+  add column if not exists parents_car_value bigint, -- 만원 단위
   add column if not exists parents_count integer,
   add column if not exists is_basic_livelihood_recipient boolean,
   add column if not exists is_near_poverty boolean,

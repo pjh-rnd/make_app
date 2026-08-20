@@ -1,7 +1,7 @@
 // 아직 Supabase 연동 전이라, 화면 모양만 먼저 보려고 가짜 데이터를 그대로 씀 (Phase 3 목표)
 // id는 상세 화면(app/deadline/[id].tsx)으로 이동할 때 URL 파라미터로 씀
 // requirements는 매칭률 계산(lib/matching.ts)에 쓰는 자격 조건
-// (maxPersonalMonthlyIncome 값은 실제 기준중위소득표를 반영한 게 아니라 예시로 대략 잡은 금액입니다)
+// (금액은 만원 단위. maxPersonalMonthlyIncome 값은 실제 기준중위소득표를 반영한 게 아니라 예시로 대략 잡은 금액입니다)
 export const DEADLINES = [
   {
     id: 'happy-housing',
@@ -15,7 +15,7 @@ export const DEADLINES = [
       '무주택 청년을 위한 공공임대주택으로, 소득·자산 기준을 충족하면 시세보다 저렴하게 거주할 수 있어요. 서류 심사 후 계약금 납부까지 약 2주가 소요돼요.',
     requirements: {
       maxAge: 39,
-      maxPersonalMonthlyIncome: 2900000,
+      maxPersonalMonthlyIncome: 290,
       requiresNoHouse: true,
       regionKeyword: '관악',
     },
@@ -30,7 +30,7 @@ export const DEADLINES = [
     meta: '월 최대 20만원 · 12개월 지원',
     detail:
       '무주택 청년 1인가구를 대상으로 월세를 최대 12개월간 지원해요. 임대차계약서, 통장사본 등 증빙서류를 기한 내 제출하지 않으면 신청이 취소될 수 있어요.',
-    requirements: { maxAge: 34, maxPersonalMonthlyIncome: 4400000, requiresNoHouse: true },
+    requirements: { maxAge: 34, maxPersonalMonthlyIncome: 440, requiresNoHouse: true },
   },
   {
     id: 'hope-double-account',

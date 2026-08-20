@@ -6,8 +6,8 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { DEADLINES } from '@/data/deadlines';
 import { calculateMatch } from '@/lib/matching';
+import { countFilledFields, TOTAL_FIELD_COUNT } from '@/lib/profileFields';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
-import { supabase } from '@/lib/supabase';
 import { calculateAge, useProfile } from '@/lib/useProfile';
 import { useSession } from '@/lib/useSession';
 
@@ -114,8 +114,10 @@ export default function HomeScreen() {
     .join(' ');
   const profileIncomeText =
     profile?.personal_monthly_income != null
-      ? `월 ${Math.round(profile.personal_monthly_income / 10000).toLocaleString()}만원`
+      ? `월 ${profile.personal_monthly_income.toLocaleString()}만원`
       : '미입력';
+  const filledFieldCount = countFilledFields(profile);
+  const completionPercent = Math.round((filledFieldCount / TOTAL_FIELD_COUNT) * 100);
   const profileHousingText =
     profile?.owns_house == null ? '미입력' : profile.owns_house ? '주택 보유' : '무주택';
 
@@ -208,9 +210,20 @@ export default function HomeScreen() {
         )}
       </View>
 
-      <Pressable style={styles.logoutButton} onPress={() => supabase.auth.signOut()}>
-        <Text style={styles.logoutButtonText}>로그아웃</Text>
-      </Pressable>
+      {/* 프로필 완성도 — 26개 항목 중 몇 개 채웠는지. 다 채울수록 매칭이 정확해진다는 걸 알려줌 */}
+      <Link href="/edit-profile" asChild>
+        <Pressable style={styles.completionCard}>
+          <View style={styles.completionTopRow}>
+            <Text style={styles.completionLabel}>프로필 완성도</Text>
+            <Text style={styles.completionCount}>
+              {filledFieldCount}/{TOTAL_FIELD_COUNT}
+            </Text>
+          </View>
+          <View style={styles.completionBarTrack}>
+            <View style={[styles.completionBarFill, { width: `${completionPercent}%` }]} />
+          </View>
+        </Pressable>
+      </Link>
 
       {/* 검색 */}
       <TextInput
@@ -470,8 +483,29 @@ const styles = StyleSheet.create({
   profileRowLabel: { fontSize: 13, color: '#A9B4CB' },
   profileRowValue: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
 
-  logoutButton: { alignSelf: 'flex-start', marginBottom: 24 },
-  logoutButtonText: { fontSize: 12, color: COLORS.inkSoft, textDecorationLine: 'underline' },
+  completionCard: {
+    backgroundColor: COLORS.paperRaise,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 24,
+  },
+  completionTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  completionLabel: { fontSize: 12, color: COLORS.inkSoft, fontWeight: '600' },
+  completionCount: { fontSize: 12, color: COLORS.mint, fontWeight: '700' },
+  completionBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.paper,
+    overflow: 'hidden',
+  },
+  completionBarFill: { height: '100%', backgroundColor: COLORS.mint, borderRadius: 3 },
 
   sectionLabel: {
     fontSize: 11,

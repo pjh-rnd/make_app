@@ -2,8 +2,8 @@ import { calculateAge, type Profile } from '@/lib/useProfile';
 
 export type Requirements = {
   maxAge?: number;
-  maxPersonalMonthlyIncome?: number; // 원 단위, 개인 월 소득 상한
-  maxHouseholdMonthlyIncome?: number; // 원 단위, 가구 월 소득 상한
+  maxPersonalMonthlyIncome?: number; // 만원 단위, 개인 월 소득 상한
+  maxHouseholdMonthlyIncome?: number; // 만원 단위, 가구 월 소득 상한
   requiresNoHouse?: boolean; // 개인 무주택 요건
   regionKeyword?: string; // 거주지(도/시/구) 중 하나에 이 단어가 포함돼야 함 (예: '서울', '관악')
 };
@@ -11,8 +11,8 @@ export type Requirements = {
 export type MatchCriterion = { label: string; met: boolean };
 export type MatchResult = { eligible: boolean; percent: number; criteria: MatchCriterion[] };
 
-function formatWon(amount: number): string {
-  return `${Math.round(amount / 10000).toLocaleString()}만원`;
+function formatManwon(amount: number): string {
+  return `${amount.toLocaleString()}만원`;
 }
 
 // 프로필과 정책의 자격 조건을 비교해서, 몇 %나 맞는지 계산
@@ -29,7 +29,7 @@ export function calculateMatch(profile: Profile | null, requirements: Requiremen
 
   if (requirements.maxPersonalMonthlyIncome != null) {
     criteria.push({
-      label: `개인 월소득 ${formatWon(requirements.maxPersonalMonthlyIncome)} 이하`,
+      label: `개인 월소득 ${formatManwon(requirements.maxPersonalMonthlyIncome)} 이하`,
       met:
         profile?.personal_monthly_income != null &&
         profile.personal_monthly_income <= requirements.maxPersonalMonthlyIncome,
@@ -38,7 +38,7 @@ export function calculateMatch(profile: Profile | null, requirements: Requiremen
 
   if (requirements.maxHouseholdMonthlyIncome != null) {
     criteria.push({
-      label: `가구 월소득 ${formatWon(requirements.maxHouseholdMonthlyIncome)} 이하`,
+      label: `가구 월소득 ${formatManwon(requirements.maxHouseholdMonthlyIncome)} 이하`,
       met:
         profile?.household_monthly_income != null &&
         profile.household_monthly_income <= requirements.maxHouseholdMonthlyIncome,

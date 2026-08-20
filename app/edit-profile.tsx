@@ -14,84 +14,34 @@ import {
 
 import { COLORS } from '@/constants/moa-colors';
 import { supabase } from '@/lib/supabase';
+import { HOUSEHOLD_COPY_MAP, SECTIONS } from '@/lib/profileFields';
 import type { Profile } from '@/lib/useProfile';
 import { useProfile } from '@/lib/useProfile';
 import { useSession } from '@/lib/useSession';
 
-type FieldType = 'text' | 'number' | 'date' | 'boolean';
-type FieldConfig = { key: keyof Profile; label: string; type: FieldType; placeholder?: string };
-type SectionConfig = { title: string; fields: FieldConfig[] };
-
-// 큰 틀(SectionConfig) 5개 × 작은 틀(FieldConfig) — 이 배열 하나로 폼 전체(입력창 렌더링 + 저장 시 변환)를 다 처리함
-const SECTIONS: SectionConfig[] = [
-  {
-    title: '개인정보',
-    fields: [
-      { key: 'birth_date', label: '생년월일', type: 'date', placeholder: 'YYYY-MM-DD' },
-      { key: 'is_university_student', label: '대학생 여부', type: 'boolean' },
-      { key: 'is_job_seeker', label: '취업준비생 여부', type: 'boolean' },
-      { key: 'region_province', label: '거주지 (시/도)', type: 'text', placeholder: '예: 서울특별시' },
-      { key: 'region_city', label: '거주지 (시/군)', type: 'text', placeholder: '해당 없으면 비워두기' },
-      { key: 'region_district', label: '거주지 (구)', type: 'text', placeholder: '예: 관악구' },
-    ],
-  },
-  {
-    title: '개인 소득 / 자산',
-    fields: [
-      { key: 'personal_monthly_income', label: '월 평균 소득', type: 'number', placeholder: '단위: 원' },
-      { key: 'personal_assets', label: '자산', type: 'number', placeholder: '단위: 원' },
-      { key: 'owns_house', label: '주택 소유 여부', type: 'boolean' },
-      { key: 'owns_car', label: '자동차 소유 여부', type: 'boolean' },
-    ],
-  },
-  {
-    title: '가족 정보',
-    fields: [
-      { key: 'family_member_count', label: '가족 구성원 수', type: 'number' },
-      { key: 'family_type', label: '가족 형태', type: 'text', placeholder: '예: 1인가구, 부모동거 등' },
-    ],
-  },
-  {
-    title: '가구 소득 / 자산',
-    fields: [
-      { key: 'household_monthly_income', label: '월 평균 소득', type: 'number', placeholder: '단위: 원' },
-      { key: 'household_assets', label: '자산', type: 'number', placeholder: '단위: 원' },
-      { key: 'household_owns_house', label: '주택 소유 여부', type: 'boolean' },
-      { key: 'household_owns_car', label: '자동차 소유 여부', type: 'boolean' },
-    ],
-  },
-  {
-    title: '추가정보',
-    fields: [
-      { key: 'university_location', label: '대학 소재지', type: 'text' },
-      { key: 'income_base_location', label: '소득 근거지', type: 'text' },
-      { key: 'subscription_account_payment_count', label: '청약통장 납입 횟수', type: 'number' },
-      {
-        key: 'subscription_account_payment_amount',
-        label: '청약통장 납입 금액',
-        type: 'number',
-        placeholder: '단위: 원',
-      },
-      {
-        key: 'subscription_account_payment_period',
-        label: '청약통장 납입 기간',
-        type: 'number',
-        placeholder: '단위: 개월',
-      },
-      { key: 'parents_income', label: '부모님 소득', type: 'number', placeholder: '단위: 원' },
-      { key: 'parents_assets', label: '부모님 자산', type: 'number', placeholder: '단위: 원' },
-      { key: 'parents_car_value', label: '부모님 차량가액', type: 'number', placeholder: '단위: 원' },
-      { key: 'parents_count', label: '부모님 수', type: 'number' },
-      { key: 'is_basic_livelihood_recipient', label: '기초생활 수급자 여부', type: 'boolean' },
-      { key: 'is_near_poverty', label: '차상위계층 여부', type: 'boolean' },
-      { key: 'is_supported_single_parent_family', label: '지원대상 한부모가족 여부', type: 'boolean' },
-    ],
-  },
-];
-
-// 편집 중엔 숫자/날짜/텍스트 다 문자열로 들고 있다가, 저장할 때 각 필드 타입에 맞게 변환함
+// 편집 중엔 숫자/날짜/텍스트 다 문자열로 들고 있다가, 저장할 때 각 필드 타입에 맞게 변환함.
+// money 타입은 화면엔 "2,900" 처럼 콤마 붙여서 보여주고, 저장 직전에만 콤마를 떼어냄.
 type FormValue = string | boolean | null;
 type FormState = Record<string, FormValue>;
+
+function stripCommas(text: string): string {
+  return text.replace(/,/g, '');
+}
+
+// 입력 중인 숫자 문자열에 천단위 콤마를 붙여줌 (숫자 아닌 문자는 제거)
+function formatMoneyInput(text: string): string {
+  const digitsOnly = stripCommas(text).replace(/[^0-9]/g, '');
+  if (!digitsOnly) return '';
+  return Number(digitsOnly).toLocaleString('ko-KR');
+}
+
+// 'YYYY-MM-DD' 형식이면서 실제로 존재하는 날짜인지 확인 (예: 2000-13-45 같은 값 거르기)
+function isValidDateString(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
 
 export default function EditProfileScreen() {
   const { session } = useSession();
@@ -111,6 +61,8 @@ export default function EditProfileScreen() {
         const raw = profile[f.key];
         if (f.type === 'boolean') {
           next[f.key] = (raw as boolean | null) ?? null;
+        } else if (f.type === 'money') {
+          next[f.key] = raw != null ? Number(raw).toLocaleString('ko-KR') : '';
         } else if (f.type === 'number') {
           next[f.key] = raw != null ? String(raw) : '';
         } else {
@@ -134,10 +86,26 @@ export default function EditProfileScreen() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  // "가구 소득/자산" 섹션에서 "개인 정보와 동일하게 채우기" 눌렀을 때 — 1인가구면 대부분 값이 같아서 입력 수고를 줄여줌
+  function copyPersonalToHousehold() {
+    setForm((prev) => {
+      const next = { ...prev };
+      for (const [from, to] of HOUSEHOLD_COPY_MAP) next[to] = prev[from];
+      return next;
+    });
+  }
+
   async function handleSave() {
     if (!session) return;
-    setSaving(true);
     setErrorMsg('');
+
+    const birthDateRaw = (form.birth_date as string) ?? '';
+    if (birthDateRaw && !isValidDateString(birthDateRaw)) {
+      setErrorMsg('생년월일 형식이 올바르지 않아요 (예: 2000-01-15)');
+      return;
+    }
+
+    setSaving(true);
 
     // 폼에 든 문자열/불리언을 실제 DB 타입(숫자/불리언/텍스트)으로 변환
     const payload: Record<string, unknown> = {
@@ -149,6 +117,9 @@ export default function EditProfileScreen() {
         const raw = form[f.key];
         if (f.type === 'boolean') {
           payload[f.key] = raw === true || raw === false ? raw : null;
+        } else if (f.type === 'money') {
+          const digits = stripCommas((raw as string) ?? '');
+          payload[f.key] = digits !== '' ? Number(digits) : null;
         } else if (f.type === 'number') {
           payload[f.key] = raw !== '' && raw != null ? Number(raw) : null;
         } else {
@@ -191,6 +162,11 @@ export default function EditProfileScreen() {
               </Pressable>
               {expanded && (
                 <View style={styles.sectionBody}>
+                  {section.title === '가구 소득 / 자산' && (
+                    <Pressable onPress={copyPersonalToHousehold} style={styles.copyButton}>
+                      <Text style={styles.copyButtonText}>개인 정보와 동일하게 채우기</Text>
+                    </Pressable>
+                  )}
                   {section.fields.map((f) => (
                     <View key={f.key} style={styles.fieldGroup}>
                       <Text style={styles.label}>{f.label}</Text>
@@ -219,6 +195,18 @@ export default function EditProfileScreen() {
                             </Text>
                           </Pressable>
                         </View>
+                      ) : f.type === 'money' ? (
+                        <View style={styles.moneyRow}>
+                          <TextInput
+                            style={[styles.input, styles.moneyInput]}
+                            value={(form[f.key] as string) ?? ''}
+                            onChangeText={(t) => setField(f.key, formatMoneyInput(t))}
+                            placeholder="0"
+                            placeholderTextColor="#B6B0A0"
+                            keyboardType="numeric"
+                          />
+                          <Text style={styles.moneyUnit}>만원</Text>
+                        </View>
                       ) : (
                         <TextInput
                           style={styles.input}
@@ -245,6 +233,10 @@ export default function EditProfileScreen() {
           ) : (
             <Text style={styles.saveButtonText}>저장</Text>
           )}
+        </Pressable>
+
+        <Pressable style={styles.logoutButton} onPress={() => supabase.auth.signOut()}>
+          <Text style={styles.logoutButtonText}>로그아웃</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -275,6 +267,16 @@ const styles = StyleSheet.create({
   sectionChevron: { fontSize: 14, color: COLORS.inkSoft },
   sectionBody: { paddingHorizontal: 16, paddingBottom: 16 },
 
+  copyButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.mintSoft,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginTop: 4,
+  },
+  copyButtonText: { fontSize: 12, color: COLORS.mint, fontWeight: '600' },
+
   fieldGroup: { marginTop: 12 },
   label: { fontSize: 12, color: COLORS.inkSoft, marginBottom: 6 },
   input: {
@@ -287,6 +289,10 @@ const styles = StyleSheet.create({
     color: COLORS.ink,
     backgroundColor: COLORS.paper,
   },
+
+  moneyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  moneyInput: { flex: 1 },
+  moneyUnit: { fontSize: 13, color: COLORS.inkSoft },
 
   boolRow: { flexDirection: 'row', gap: 8 },
   boolChip: {
@@ -308,7 +314,9 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     alignItems: 'center',
     marginTop: 8,
-    marginBottom: 24,
   },
   saveButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  logoutButton: { alignSelf: 'center', marginTop: 20, marginBottom: 24 },
+  logoutButtonText: { fontSize: 12.5, color: COLORS.inkSoft, textDecorationLine: 'underline' },
 });
