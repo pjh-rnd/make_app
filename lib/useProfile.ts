@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
 
@@ -14,13 +14,17 @@ export type Profile = {
 export function useProfile(userId: string | undefined) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  // 화면에 다시 돌아올 때(useFocusEffect)마다 refresh가 또 불리는데, 그때마다 loading을
+  // true로 바꾸면 "불러오는 중..." 텍스트로 잠깐 바뀌면서 화면 높이가 출렁여 튀어 보임.
+  // 그래서 "이미 한 번 불러온 적 있는지"를 기억해뒀다가, 두 번째부터는 로딩 화면 없이 조용히 갱신함.
+  const hasLoadedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!userId) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!hasLoadedOnce.current) setLoading(true);
     // maybeSingle: row가 없으면 에러 대신 null을 줌 (아직 프로필 설정 안 한 신규 유저 대응)
     const { data, error } = await supabase
       .from('profiles')
@@ -33,6 +37,7 @@ export function useProfile(userId: string | undefined) {
     } else {
       setProfile(data);
     }
+    hasLoadedOnce.current = true;
     setLoading(false);
   }, [userId]);
 
