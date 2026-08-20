@@ -87,13 +87,17 @@ export default function HomeScreen() {
   const { profile, loading: profileLoading, refresh: refreshProfile } = useProfile(
     session?.user.id
   );
-  const { savedIds, toggle: toggleSaved } = useSavedPolicies(session?.user.id);
+  const { savedIds, toggle: toggleSaved, refresh: refreshSaved } = useSavedPolicies(
+    session?.user.id
+  );
 
-  // 이 화면에 다시 돌아올 때마다(수정 화면에서 뒤로 왔을 때 등) 최신 프로필을 다시 불러옴
+  // 이 화면에 다시 돌아올 때마다(수정 화면·상세페이지에서 뒤로 왔을 때 등) 최신 프로필/찜 목록을 다시 불러옴
+  // (상세페이지에서 찜했는데 리스트가 예전 상태를 들고 있으면, 다시 찜하려다 "이미 있음" 에러로 안 눌리는 것처럼 보임)
   useFocusEffect(
     useCallback(() => {
       refreshProfile();
-    }, [refreshProfile])
+      refreshSaved();
+    }, [refreshProfile, refreshSaved])
   );
 
   const hasProfile = !!profile && (profile.age || profile.region || profile.income_level || profile.housing_status);
