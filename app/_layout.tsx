@@ -7,13 +7,17 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+// 렌더링마다 새 객체가 생기면 navigator가 "옵션이 바뀌었다"고 오인해 헤더를 계속 다시 그릴 수 있어서,
+// 컴포넌트 밖에 고정된 값으로 빼둠 (뒤로가기 화살표가 계속 깜빡이던 원인)
+const SCREEN_OPTIONS = { headerBackButtonDisplayMode: 'minimal' as const };
+
 export default function RootLayout() {
   // 화면 본문(COLORS)이 아직 라이트 팔레트로 고정돼 있어서, 시스템 다크모드를 그대로 따라가면
   // 헤더/탭바만 어두워지고 나머지는 밝은 채로 남아 어색해짐. 그래서 일단 라이트로 통일해둠
   // — 나중에 COLORS에 다크 팔레트를 따로 만들면 그때 시스템 설정을 다시 따라가게 하면 됨.
   return (
     <ThemeProvider value={DefaultTheme}>
-      <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
+      <Stack screenOptions={SCREEN_OPTIONS}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="edit-profile" options={{ title: '마이페이지' }} />
