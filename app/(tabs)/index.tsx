@@ -157,8 +157,15 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.brand}>Fit Me</Text>
-      <Text style={styles.brandSub}>나에게 맞는 청년정책 캘린더</Text>
+      <View style={styles.topBar}>
+        <View>
+          <Text style={styles.brand}>Fit Me</Text>
+          <Text style={styles.brandSub}>나에게 맞는 청년정책 캘린더</Text>
+        </View>
+        <Link href="/edit-profile" style={styles.myPageButton}>
+          <Text style={styles.myPageIcon}>👤</Text>
+        </Link>
+      </View>
 
       {/* 프로필 카드 - 이제 Supabase의 profiles 테이블에서 실제로 불러옴 */}
       <View style={styles.profileCard}>
@@ -395,8 +402,26 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.paper },
   content: { padding: 20, paddingTop: 60, paddingBottom: 40 },
 
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
   brand: { fontSize: 24, fontWeight: '700', color: COLORS.ink },
-  brandSub: { fontSize: 12, color: COLORS.inkSoft, marginTop: 2, marginBottom: 20 },
+  brandSub: { fontSize: 12, color: COLORS.inkSoft, marginTop: 2 },
+  myPageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.paperRaise,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    textAlign: 'center',
+    lineHeight: 34,
+    overflow: 'hidden',
+  },
+  myPageIcon: { fontSize: 16 },
 
   profileCard: {
     backgroundColor: COLORS.ink,
