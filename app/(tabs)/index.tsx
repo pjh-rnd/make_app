@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { DEADLINES } from '@/data/deadlines';
+import { computeDday } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
 import { countFilledFields, TOTAL_FIELD_COUNT } from '@/lib/profileFields';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
@@ -21,15 +22,22 @@ const INITIAL_INTERESTS = [
   { id: 'welfare', label: '🏥 복지', active: false },
 ];
 
-// 날짜(day 숫자)별로 어떤 정책 마감이 있는지 - 진짜로는 Supabase에서 가져올 데이터, 지금은 가짜값
-const DEADLINE_DAYS: Record<number, { category: keyof typeof CATEGORY_COLOR }[]> = {
-  12: [{ category: 'money' }],
-  18: [{ category: 'housing' }, { category: 'job' }],
-  19: [{ category: 'housing' }],
-  26: [{ category: 'money' }],
-};
-
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+// 특정 연/월에 마감인 정책들을, 날짜(day 숫자) 기준으로 묶어줌 — 캘린더에 점(dot) 찍는 데 씀.
+// 예전엔 이걸 DEADLINES랑 따로 노는 가짜 목록으로 손으로 관리했는데, 이제 deadlineDate가 생겨서
+// 실제 정책 데이터에서 바로 계산함 (그래야 점 찍힌 날 = 실제 그 날 마감인 정책이 보장됨)
+function groupDeadlinesByDay(deadlines: typeof DEADLINES, year: number, month: number) {
+  const map: Record<number, { category: string }[]> = {};
+  for (const d of deadlines) {
+    const dt = new Date(d.deadlineDate);
+    if (dt.getFullYear() === year && dt.getMonth() === month) {
+      const day = dt.getDate();
+      (map[day] ??= []).push({ category: d.categoryId });
+    }
+  }
+  return map;
+}
 
 // 특정 연/월(month는 0=1월)의 달력 칸을 만드는 함수.
 // 이번 달 앞뒤로 빈 칸을 채워서 7의 배수(한 주 단위)로 맞춰줌.
@@ -65,6 +73,7 @@ export default function HomeScreen() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const weeks = buildMonthGrid(viewYear, viewMonth);
+  const deadlineDays = groupDeadlinesByDay(DEADLINES, viewYear, viewMonth);
 
   function goToPrevMonth() {
     if (viewMonth === 0) {
@@ -153,9 +162,13 @@ export default function HomeScreen() {
         d.meta.includes(trimmedQuery)
     )
     .filter((d) => !showSavedOnly || savedIds.has(d.id))
-    .filter(
-      (d) => selectedDay === null || (DEADLINE_DAYS[selectedDay] ?? []).some((x) => x.category === d.categoryId)
-    );
+    .filter((d) => {
+      if (selectedDay === null) return true;
+      const dt = new Date(d.deadlineDate);
+      return (
+        dt.getFullYear() === viewYear && dt.getMonth() === viewMonth && dt.getDate() === selectedDay
+      );
+    });
 
   // 각 마감일마다 내 프로필과 비교해서 자격 여부 계산, 그 중 실제로 지원 가능한 것 하나를 배너에 띄움
   const deadlinesWithMatch = filteredDeadlines.map((d) => ({
@@ -280,7 +293,7 @@ export default function HomeScreen() {
                 cell.day === today.getDate() &&
                 viewMonth === today.getMonth() &&
                 viewYear === today.getFullYear();
-              const dots = cell.inMonth ? DEADLINE_DAYS[cell.day] : undefined;
+              const dots = cell.inMonth ? deadlineDays[cell.day] : undefined;
               const isSelected = cell.inMonth && selectedDay === cell.day;
               return (
                 <Pressable
@@ -330,7 +343,8 @@ export default function HomeScreen() {
         <Text style={styles.emptyText}>선택된 관심 분야에 해당하는 마감이 없어요</Text>
       )}
       {deadlinesWithMatch.map((d) => {
-        const dstyle = ddayStyle(d.urgency);
+        const { label: ddayLabel, urgency } = computeDday(d.deadlineDate);
+        const dstyle = ddayStyle(urgency);
         const catColor = CATEGORY_COLOR[d.categoryId];
         const unmetCount = d.match.criteria.filter((c) => !c.met).length;
         const isAlmost = !!(hasProfile && !d.match.eligible && d.match.criteria.length > 0 && unmetCount === 1);
@@ -342,7 +356,7 @@ export default function HomeScreen() {
             <Link href={`/deadline/${d.id}`} asChild>
               <Pressable style={styles.deadlineCard}>
                 <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
-                  <Text style={[styles.ddayText, { color: dstyle.text }]}>{d.dday}</Text>
+                  <Text style={[styles.ddayText, { color: dstyle.text }]}>{ddayLabel}</Text>
                 </View>
                 <View style={styles.deadlineInfo}>
                   <View style={styles.deadlineTopRow}>
@@ -368,7 +382,7 @@ export default function HomeScreen() {
               </Pressable>
             </Link>
             <Pressable
-              onPress={() => toggleSaved(d.id)}
+              onPress={() => toggleSaved({ id: d.id, title: d.title, deadlineDate: d.deadlineDate })}
               hitSlop={10}
               style={styles.heartButton}>
               <Text style={styles.heartIcon}>{isSaved ? '❤️' : '🤍'}</Text>

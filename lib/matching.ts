@@ -15,6 +15,15 @@ function formatManwon(amount: number): string {
   return `${amount.toLocaleString()}만원`;
 }
 
+// "서울특별시"/"서울시"/"서울"처럼 사람마다 다르게 적는 지역 표기를 매칭 비교용으로만 통일함
+// (저장은 원래 텍스트 그대로 두고, 비교할 때만 접미사를 뗌)
+function normalizeRegion(text: string): string {
+  return text
+    .replace(/특별자치시|특별자치도|광역시|특별시|자치도|자치시/g, '')
+    .replace(/(.{2,})(도|시|군|구)$/, '$1')
+    .trim();
+}
+
 // 프로필과 정책의 자격 조건을 비교해서, 몇 %나 맞는지 계산
 export function calculateMatch(profile: Profile | null, requirements: Requirements): MatchResult {
   const criteria: MatchCriterion[] = [];
@@ -58,7 +67,7 @@ export function calculateMatch(profile: Profile | null, requirements: Requiremen
       .join(' ');
     criteria.push({
       label: `${requirements.regionKeyword} 거주`,
-      met: regionText.includes(requirements.regionKeyword),
+      met: normalizeRegion(regionText).includes(normalizeRegion(requirements.regionKeyword)),
     });
   }
 

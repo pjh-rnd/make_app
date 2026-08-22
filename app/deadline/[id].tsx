@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { HeaderBackButton } from '@/components/header-back-button';
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { DEADLINES } from '@/data/deadlines';
+import { computeDday } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
 import { useProfile } from '@/lib/useProfile';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
@@ -27,7 +28,8 @@ export default function DeadlineDetailScreen() {
     );
   }
 
-  const dstyle = ddayStyle(item.urgency);
+  const { label: ddayLabel, urgency } = computeDday(item.deadlineDate);
+  const dstyle = ddayStyle(urgency);
   const catColor = CATEGORY_COLOR[item.categoryId];
   const match = calculateMatch(profile, item.requirements);
 
@@ -40,10 +42,14 @@ export default function DeadlineDetailScreen() {
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         <View style={styles.topRow}>
           <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
-            <Text style={[styles.ddayText, { color: dstyle.text }]}>{item.dday}</Text>
+            <Text style={[styles.ddayText, { color: dstyle.text }]}>{ddayLabel}</Text>
           </View>
           {session && (
-            <Pressable onPress={() => toggleSaved(item.id)} hitSlop={10}>
+            <Pressable
+              onPress={() =>
+                toggleSaved({ id: item.id, title: item.title, deadlineDate: item.deadlineDate })
+              }
+              hitSlop={10}>
               <Text style={styles.heartIcon}>{savedIds.has(item.id) ? '❤️' : '🤍'}</Text>
             </Pressable>
           )}
