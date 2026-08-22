@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,16 +13,17 @@ import {
   View,
 } from 'react-native';
 
+import { FitMeLogo } from '@/components/fit-me-logo';
+import { KakaoIcon, NaverIcon } from '@/components/social-icon';
 import { COLORS } from '@/constants/moa-colors';
+import { signInWithProvider } from '@/lib/socialAuth';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 
-// 로그인 전에 "이 앱이 뭘 해주는지" 짧게 보여주는 소개 문구 (빈 로그인폼만 보이는 게 아쉬워서 추가)
-const PITCH_ITEMS = [
-  { icon: '📅', text: 'D-day 캘린더로 마감 한눈에 확인' },
-  { icon: '🎯', text: '내 조건에 맞는 정책만 골라서 매칭' },
-  { icon: '🔔', text: '마감 하루 전 알림으로 놓치지 않게' },
-];
+// 마지막으로 성공한 간편로그인 수단을 기기에 저장해뒀다가, 다음에 로그인 화면에 들어오면
+// 그 아이콘 위에 "최근 로그인" 말풍선을 띄워줌 (카카오/네이버 로그인 앱들이 흔히 쓰는 패턴)
+const RECENT_LOGIN_KEY = 'fitme.recentSocialLogin';
+type SocialMethod = 'kakao' | 'naver';
 
 export default function LoginScreen() {
   const { session, loading: sessionLoading } = useSession();
@@ -32,6 +34,14 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
+  const [socialLoading, setSocialLoading] = useState<SocialMethod | null>(null);
+  const [recentMethod, setRecentMethod] = useState<SocialMethod | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_LOGIN_KEY).then((v) => {
+      if (v === 'kakao' || v === 'naver') setRecentMethod(v);
+    });
+  }, []);
 
   // 이미 로그인되어 있으면 로그인 화면에 머물 이유가 없으니 메인으로 보냄
   if (!sessionLoading && session) {
@@ -62,22 +72,31 @@ export default function LoginScreen() {
     setSubmitting(false);
   }
 
+  async function handleSocialLogin(method: SocialMethod) {
+    setErrorMsg('');
+    setInfoMsg('');
+    setSocialLoading(method);
+    const { error, cancelled } = await signInWithProvider(method === 'kakao' ? 'kakao' : 'custom:naver');
+    setSocialLoading(null);
+    if (error) {
+      setErrorMsg(error.message);
+      return;
+    }
+    if (cancelled) return;
+    await AsyncStorage.setItem(RECENT_LOGIN_KEY, method);
+    setRecentMethod(method);
+    // 로그인 성공하면 useSession이 세션 변화를 감지해서 위쪽 리다이렉트가 알아서 처리함
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-      <Text style={styles.brand}>Fit Me</Text>
-      <Text style={styles.brandSub}>나에게 맞는 청년정책 캘린더</Text>
-
-      <View style={styles.pitchBox}>
-        {PITCH_ITEMS.map((item) => (
-          <View key={item.text} style={styles.pitchRow}>
-            <Text style={styles.pitchIcon}>{item.icon}</Text>
-            <Text style={styles.pitchText}>{item.text}</Text>
-          </View>
-        ))}
+      <View style={styles.logoWrap}>
+        <FitMeLogo />
       </View>
+      <Text style={styles.brandSub}>나에게 맞는 청년정책 캘린더</Text>
 
       <View style={styles.form}>
         <Text style={styles.label}>이메일</Text>
@@ -120,6 +139,55 @@ export default function LoginScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {/* 간편로그인 — 화면 맨 아래쪽에 둠. 최근에 성공했던 수단 위에는 말풍선으로 "최근 로그인" 표시 */}
+      <View style={styles.socialSection}>
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerLabel}>간편로그인</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <View style={styles.socialRow}>
+          <View style={styles.socialItem}>
+            {recentMethod === 'kakao' && (
+              <View style={styles.recentBadge}>
+                <Text style={styles.recentBadgeText}>최근 로그인</Text>
+                <View style={styles.recentBadgeArrow} />
+              </View>
+            )}
+            <Pressable onPress={() => handleSocialLogin('kakao')} disabled={socialLoading !== null}>
+              {socialLoading === 'kakao' ? (
+                <View style={styles.socialLoadingCircle}>
+                  <ActivityIndicator color={COLORS.inkSoft} />
+                </View>
+              ) : (
+                <KakaoIcon />
+              )}
+            </Pressable>
+            <Text style={styles.socialLabel}>카카오톡</Text>
+          </View>
+
+          <View style={styles.socialItem}>
+            {recentMethod === 'naver' && (
+              <View style={styles.recentBadge}>
+                <Text style={styles.recentBadgeText}>최근 로그인</Text>
+                <View style={styles.recentBadgeArrow} />
+              </View>
+            )}
+            <Pressable onPress={() => handleSocialLogin('naver')} disabled={socialLoading !== null}>
+              {socialLoading === 'naver' ? (
+                <View style={styles.socialLoadingCircle}>
+                  <ActivityIndicator color={COLORS.inkSoft} />
+                </View>
+              ) : (
+                <NaverIcon />
+              )}
+            </Pressable>
+            <Text style={styles.socialLabel}>네이버</Text>
+          </View>
+        </View>
+      </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -127,51 +195,92 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.paper },
-  scrollContent: { flexGrow: 1, padding: 24, justifyContent: 'center' },
-  brand: { fontSize: 28, fontWeight: '700', color: COLORS.ink, textAlign: 'center' },
+  // 예전엔 padding 24에 요소 사이 여백도 다 좁아서 화면이 빽빽해 보였음 — 전체적으로 숨쉴 틈을 늘림
+  scrollContent: { flexGrow: 1, padding: 28, paddingVertical: 40, justifyContent: 'center' },
+  logoWrap: { alignItems: 'center' },
   brandSub: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.inkSoft,
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 32,
+    marginTop: 6,
+    marginBottom: 40,
   },
-  pitchBox: { marginBottom: 28, gap: 10 },
-  pitchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  pitchIcon: { fontSize: 16, width: 22, textAlign: 'center' },
-  pitchText: { fontSize: 13, color: COLORS.inkSoft, flex: 1 },
   form: {
     backgroundColor: COLORS.paperRaise,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: COLORS.line,
-    padding: 20,
+    padding: 24,
   },
-  label: { fontSize: 12, color: COLORS.inkSoft, marginBottom: 6, marginTop: 12 },
+  label: { fontSize: 12.5, color: COLORS.inkSoft, marginBottom: 8, marginTop: 18 },
   input: {
     borderWidth: 1,
     borderColor: COLORS.line,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    fontSize: 15,
     color: COLORS.ink,
     backgroundColor: COLORS.paper,
   },
-  error: { color: COLORS.coral, fontSize: 12.5, marginTop: 14 },
-  info: { color: COLORS.mint, fontSize: 12.5, marginTop: 14 },
+  error: { color: COLORS.coral, fontSize: 13, marginTop: 16, lineHeight: 18 },
+  info: { color: COLORS.mint, fontSize: 13, marginTop: 16, lineHeight: 18 },
   submitButton: {
     backgroundColor: COLORS.ink,
-    borderRadius: 10,
-    paddingVertical: 13,
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 26,
   },
-  submitButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  submitButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   switchModeText: {
     color: COLORS.inkSoft,
-    fontSize: 12.5,
+    fontSize: 13,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 20,
+  },
+
+  // 간편로그인(카카오/네이버) — 화면 맨 아래쪽
+  socialSection: { marginTop: 36 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.line },
+  dividerLabel: { fontSize: 12.5, color: COLORS.inkSoft },
+  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 36, marginTop: 22 },
+  socialItem: { alignItems: 'center', position: 'relative' },
+  socialLabel: { fontSize: 12, color: COLORS.inkSoft, marginTop: 8 },
+  socialLoadingCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.paperRaise,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+  // "최근 로그인" 말풍선 — 아이콘 바로 위에 뜨고, 아래로 작은 화살표(꼬리)가 아이콘을 가리킴
+  recentBadge: {
+    position: 'absolute',
+    bottom: '100%',
+    marginBottom: 8,
+    alignItems: 'center',
+    alignSelf: 'center',
+  },
+  recentBadgeText: {
+    backgroundColor: COLORS.coral,
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  recentBadgeArrow: {
+    width: 8,
+    height: 8,
+    backgroundColor: COLORS.coral,
+    marginTop: -4,
+    transform: [{ rotate: '45deg' }],
   },
 });

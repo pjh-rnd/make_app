@@ -19,6 +19,12 @@ export default function RootLayout() {
         {/* 네이티브 헤더 대신 화면 안에서 직접 뒤로가기+제목을 그림 (iOS가 헤더 버튼에 자동으로
             씌우는 원형 배경이 계속 깜빡이는 문제가 있어서, 네이티브 헤더 자체를 안 씀) */}
         <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
+        {/* search.tsx가 자기 안에서 <Stack.Screen headerShown:false>로 스스로 설정했었는데,
+            그게 안 먹혀서 기본 네이티브 헤더가 뜨고("search" 제목 + 뒤로가기 버튼에 이전 화면
+            이름인 "(tabs)"가 그대로 노출됐음) — 다른 화면들처럼 여기 레이아웃에서 직접 선언하니 해결됨 */}
+        <Stack.Screen name="search" options={{ headerShown: false }} />
+        <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

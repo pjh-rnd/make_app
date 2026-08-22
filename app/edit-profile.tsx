@@ -15,9 +15,18 @@ import {
 import { HeaderBackButton } from '@/components/header-back-button';
 import { COLORS } from '@/constants/moa-colors';
 import { supabase } from '@/lib/supabase';
-import { HOUSEHOLD_COPY_MAP, SECTIONS } from '@/lib/profileFields';
+import {
+  countFilledFields,
+  effectiveTotalFieldCount,
+  getDistrictOptions,
+  getRegionInfo,
+  HOUSEHOLD_COPY_MAP,
+  isRegionDistrictApplicable,
+  PROVINCE_OPTIONS,
+  SECTIONS,
+} from '@/lib/profileFields';
 import type { Profile } from '@/lib/useProfile';
-import { useProfile } from '@/lib/useProfile';
+import { calculateAge, useProfile } from '@/lib/useProfile';
 import { useSession } from '@/lib/useSession';
 
 // 편집 중엔 숫자/날짜/텍스트 다 문자열로 들고 있다가, 저장할 때 각 필드 타입에 맞게 변환함.
@@ -74,6 +83,28 @@ export default function EditProfileScreen() {
     setForm(next);
   }, [profile]);
 
+  const hasProfile =
+    !!profile &&
+    (profile.birth_date ||
+      profile.region_province ||
+      profile.personal_monthly_income != null ||
+      profile.owns_house != null);
+
+  // "내 조건" 카드에 보여줄 요약 텍스트 — 홈 화면 상단에 있던 걸 여기로 옮겨옴 (개인정보라 마이페이지에서만 보여줘야 해서)
+  const profileAge = calculateAge(profile?.birth_date);
+  const profileRegionText = [profile?.region_province, profile?.region_city, profile?.region_district]
+    .filter(Boolean)
+    .join(' ');
+  const profileIncomeText =
+    profile?.personal_monthly_income != null
+      ? `월 ${profile.personal_monthly_income.toLocaleString()}만원`
+      : '미입력';
+  const profileHousingText =
+    profile?.owns_house == null ? '미입력' : profile.owns_house ? '주택 보유' : '무주택';
+  const filledFieldCount = countFilledFields(profile);
+  const totalFieldCount = effectiveTotalFieldCount(profile?.region_province, profile?.region_city);
+  const completionPercent = Math.round((filledFieldCount / totalFieldCount) * 100);
+
   function toggleSection(title: string) {
     setExpandedTitles((prev) => {
       const next = new Set(prev);
@@ -85,6 +116,17 @@ export default function EditProfileScreen() {
 
   function setField(key: keyof Profile, value: FormValue) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  // 시/도를 바꾸면 그 아래 시/군·구 목록 자체가 달라지므로(서울 25개 구 ↔ 경기도 31개 시/군),
+  // 이전에 골라둔 시/군·구 값이 새 시/도에서는 말이 안 될 수 있어서 같이 초기화함
+  function handleProvinceChange(province: string) {
+    setForm((prev) => ({ ...prev, region_province: province, region_city: '', region_district: '' }));
+  }
+
+  // 시/군을 바꾸면 그 아래 "구" 목록도 달라지므로(수원시 4개 구 ↔ 성남시 3개 구), 구 값도 같이 초기화함
+  function handleCityChange(city: string) {
+    setForm((prev) => ({ ...prev, region_city: city, region_district: '' }));
   }
 
   // "가구 소득/자산" 섹션에서 "개인 정보와 동일하게 채우기" 눌렀을 때 — 1인가구면 대부분 값이 같아서 입력 수고를 줄여줌
@@ -157,6 +199,37 @@ export default function EditProfileScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader />
       <ScrollView contentContainerStyle={styles.content}>
+        {/* 내 조건 카드 — 전엔 홈 화면 맨 위에 있었는데, 로그인하자마자 개인정보가 바로 보이는 게
+            프라이버시상 별로라 마이페이지(여기)에 들어왔을 때만 보이도록 옮김 */}
+        <View style={styles.profileCard}>
+          <Text style={styles.cardLabel}>내 조건</Text>
+          {hasProfile ? (
+            <>
+              <ProfileRow label="나이" value={profileAge != null ? `${profileAge}세` : '미입력'} />
+              <ProfileRow label="지역" value={profileRegionText || '미입력'} />
+              <ProfileRow label="소득" value={profileIncomeText} />
+              <ProfileRow label="주거" value={profileHousingText} last />
+            </>
+          ) : (
+            <Text style={styles.profileEmptyText}>
+              아직 프로필이 없어요. 아래 항목을 입력해주세요.
+            </Text>
+          )}
+        </View>
+
+        {/* 프로필 완성도 — 총 항목 중 몇 개 채웠는지. 다 채울수록 매칭이 정확해진다는 걸 알려줌 */}
+        <View style={styles.completionCard}>
+          <View style={styles.completionTopRow}>
+            <Text style={styles.completionLabel}>프로필 완성도</Text>
+            <Text style={styles.completionCount}>
+              {filledFieldCount}/{totalFieldCount}
+            </Text>
+          </View>
+          <View style={styles.completionBarTrack}>
+            <View style={[styles.completionBarFill, { width: `${completionPercent}%` }]} />
+          </View>
+        </View>
+
         {SECTIONS.map((section) => {
           const expanded = expandedTitles.has(section.title);
           return (
@@ -172,7 +245,24 @@ export default function EditProfileScreen() {
                       <Text style={styles.copyButtonText}>개인 정보와 동일하게 채우기</Text>
                     </Pressable>
                   )}
-                  {section.fields.map((f) => (
+                  {section.fields.map((f) => {
+                    // 시/도·시/군·구 세 필드는 서로 연결돼 있어서(시/도 바뀌면 시/군·구 목록도 바뀜)
+                    // region_province를 만났을 때 한 번에 같이 그리고, 나머지 둘은 건너뜀
+                    if (f.key === 'region_city' || f.key === 'region_district') return null;
+                    if (f.key === 'region_province') {
+                      return (
+                        <RegionFields
+                          key="region-fields"
+                          province={(form.region_province as string) ?? ''}
+                          city={(form.region_city as string) ?? ''}
+                          district={(form.region_district as string) ?? ''}
+                          onProvinceChange={handleProvinceChange}
+                          onCityChange={handleCityChange}
+                          onDistrictChange={(v) => setField('region_district', v)}
+                        />
+                      );
+                    }
+                    return (
                     <View key={f.key} style={styles.fieldGroup}>
                       <Text style={styles.label}>{f.label}</Text>
                       {f.type === 'boolean' ? (
@@ -240,7 +330,8 @@ export default function EditProfileScreen() {
                         />
                       )}
                     </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -262,6 +353,130 @@ export default function EditProfileScreen() {
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+// 홈 화면의 "다가오는 마감" 같은 접이식 섹션과 같은 방식(▾/▸ 화살표로 열고 닫기) — 시/도·시/군·구
+// 옵션이 최대 31개까지 있어서 항상 펼쳐두면 화면을 너무 많이 차지해서, 평소엔 지금 고른 값만
+// 한 줄로 보여주고 눌러야 목록이 펼쳐지게 함. 옵션을 고르면 자동으로 다시 접힘.
+function CollapsiblePicker({
+  label,
+  options,
+  value,
+  onChange,
+  placeholder = '선택해주세요',
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={styles.label}>{label}</Text>
+      <Pressable onPress={() => setOpen((v) => !v)} style={styles.collapsibleHeader}>
+        <Text style={[styles.collapsibleValue, !value && styles.collapsiblePlaceholder]}>
+          {value || placeholder}
+        </Text>
+        <Text style={styles.collapsibleChevron}>{open ? '▾' : '▸'}</Text>
+      </Pressable>
+      {open && (
+        <View style={[styles.pickerRow, styles.collapsibleOptions]}>
+          {options.map((option) => (
+            <Pressable
+              key={option}
+              onPress={() => {
+                onChange(option);
+                setOpen(false);
+              }}
+              style={[styles.pickerChip, value === option && styles.boolChipActive]}>
+              <Text style={[styles.boolChipText, value === option && styles.boolChipTextActive]}>
+                {option}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// "거주지 (시/도)"→"거주지 (시/군)"→"거주지 (구)" 세 단계를 한 번에 그림 — 위 단계가 바뀌면 아래
+// 단계 옵션 자체가 달라져서(서울엔 시/군이 없고, 수원시에만 구가 있는 식) 셋을 따로 못 떼어놓음.
+function RegionFields({
+  province,
+  city,
+  district,
+  onProvinceChange,
+  onCityChange,
+  onDistrictChange,
+}: {
+  province: string;
+  city: string;
+  district: string;
+  onProvinceChange: (v: string) => void;
+  onCityChange: (v: string) => void;
+  onDistrictChange: (v: string) => void;
+}) {
+  const info = getRegionInfo(province);
+  const districtOptions = getDistrictOptions(province, city);
+  const districtApplicable = isRegionDistrictApplicable(province, city);
+
+  return (
+    <>
+      <CollapsiblePicker
+        label="거주지 (시/도)"
+        options={PROVINCE_OPTIONS}
+        value={province}
+        onChange={onProvinceChange}
+      />
+
+      {/* 특별시/광역시는 시/군 단계 자체가 없어서 이 필드는 통째로 숨김 */}
+      {info?.kind === 'province' && (
+        <CollapsiblePicker
+          label="거주지 (시/군)"
+          options={info.cities}
+          value={city}
+          onChange={onCityChange}
+        />
+      )}
+
+      {info?.kind === 'metro' && info.districts.length === 0 && (
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>거주지 (구/군)</Text>
+          <Text style={styles.regionHint}>{province}는 별도 구/군 구분이 없어요</Text>
+        </View>
+      )}
+
+      {districtApplicable && (
+        <CollapsiblePicker
+          label={info?.kind === 'metro' ? '거주지 (구/군)' : '거주지 (구)'}
+          options={districtOptions}
+          value={district}
+          onChange={onDistrictChange}
+        />
+      )}
+
+      {/* province인데 아직 시/군을 안 골랐거나, 고른 시가 구가 없는 곳이면 안내만 보여줌 */}
+      {info?.kind === 'province' && city && !districtApplicable && (
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>거주지 (구)</Text>
+          <Text style={styles.regionHint}>{city}는 별도 구 구분이 없어요</Text>
+        </View>
+      )}
+    </>
+  );
+}
+
+// 반복되는 "라벨: 값" 줄을 위한 작은 컴포넌트 (Props로 label/value/last를 받음)
+function ProfileRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  return (
+    <View style={[styles.profileRow, last && { borderBottomWidth: 0 }]}>
+      <Text style={styles.profileRowLabel}>{label}</Text>
+      <Text style={styles.profileRowValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -289,6 +504,54 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 40 },
   center: { flex: 1, backgroundColor: COLORS.paper, justifyContent: 'center', alignItems: 'center' },
   content: { padding: 20 },
+
+  profileCard: {
+    backgroundColor: COLORS.ink,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+  },
+  cardLabel: {
+    fontSize: 11,
+    color: '#8FA3C8',
+    textTransform: 'uppercase',
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  profileEmptyText: { fontSize: 12.5, color: '#A9B4CB', lineHeight: 18 },
+  profileRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  profileRowLabel: { fontSize: 13, color: '#A9B4CB' },
+  profileRowValue: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
+
+  completionCard: {
+    backgroundColor: COLORS.paperRaise,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+  },
+  completionTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  completionLabel: { fontSize: 12, color: COLORS.inkSoft, fontWeight: '600' },
+  completionCount: { fontSize: 12, color: COLORS.mint, fontWeight: '700' },
+  completionBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.paper,
+    overflow: 'hidden',
+  },
+  completionBarFill: { height: '100%', backgroundColor: COLORS.mint, borderRadius: 3 },
 
   section: {
     backgroundColor: COLORS.paperRaise,
@@ -331,6 +594,24 @@ const styles = StyleSheet.create({
     color: COLORS.ink,
     backgroundColor: COLORS.paper,
   },
+
+  regionHint: { fontSize: 12.5, color: COLORS.inkSoft, fontStyle: 'italic' },
+  // 홈 화면 "다가오는 마감" 접이식 섹션 헤더와 같은 느낌 — 지금 값 + 화살표(▾/▸)
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: COLORS.paper,
+  },
+  collapsibleValue: { fontSize: 14, color: COLORS.ink, fontWeight: '600' },
+  collapsiblePlaceholder: { color: '#B6B0A0', fontWeight: '400' },
+  collapsibleChevron: { fontSize: 16, color: COLORS.inkSoft, fontWeight: '700' },
+  collapsibleOptions: { marginTop: 10 },
 
   moneyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   moneyInput: { flex: 1 },

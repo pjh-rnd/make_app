@@ -1,10 +1,10 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { HeaderBackButton } from '@/components/header-back-button';
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { DEADLINES } from '@/data/deadlines';
-import { computeDday } from '@/lib/deadlineUtils';
+import { computeDday, formatMonthDay } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
 import { useProfile } from '@/lib/useProfile';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
@@ -28,8 +28,8 @@ export default function DeadlineDetailScreen() {
     );
   }
 
-  const { label: ddayLabel, urgency } = computeDday(item.deadlineDate);
-  const dstyle = ddayStyle(urgency);
+  const { label: ddayLabel, phase } = computeDday(item.startDate, item.deadlineDate);
+  const dstyle = ddayStyle(phase);
   const catColor = CATEGORY_COLOR[item.categoryId];
   const match = calculateMatch(profile, item.requirements);
 
@@ -58,6 +58,9 @@ export default function DeadlineDetailScreen() {
         <Text style={[styles.category, { color: catColor }]}>{item.category}</Text>
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.meta}>{item.meta}</Text>
+        <Text style={styles.period}>
+          신청기간 {formatMonthDay(item.startDate)} ~ {formatMonthDay(item.deadlineDate)}
+        </Text>
 
         <View style={styles.divider} />
 
@@ -74,6 +77,30 @@ export default function DeadlineDetailScreen() {
             {c.met ? '✓' : '✗'} {c.label}
           </Text>
         ))}
+
+        {item.perks.length > 0 && (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>이런 점이 좋아요!</Text>
+            {item.perks.map((perk) => (
+              <Text key={perk} style={styles.perk}>
+                ✨ {perk}
+              </Text>
+            ))}
+          </>
+        )}
+
+        {item.links.length > 0 && (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>관련 링크</Text>
+            {item.links.map((link) => (
+              <Pressable key={link.url} onPress={() => Linking.openURL(link.url)}>
+                <Text style={styles.link}>🔗 {link.label}</Text>
+              </Pressable>
+            ))}
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -99,7 +126,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 12,
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: COLORS.ink },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: COLORS.ink },
   headerSpacer: { width: 40 },
   content: { padding: 20, paddingTop: 4, paddingBottom: 40 },
   notFound: { fontSize: 14, color: COLORS.inkSoft, padding: 20 },
@@ -116,24 +143,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     alignSelf: 'flex-start',
   },
-  ddayText: { fontWeight: '700', fontSize: 14 },
-  heartIcon: { fontSize: 20 },
+  ddayText: { fontWeight: '700', fontSize: 15 },
+  heartIcon: { fontSize: 22 },
 
-  category: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
-  title: { fontSize: 20, fontWeight: '700', color: COLORS.ink, marginTop: 6, lineHeight: 27 },
-  meta: { fontSize: 13, color: COLORS.inkSoft, marginTop: 8 },
+  category: { fontSize: 13.5, fontWeight: '700', letterSpacing: 0.3 },
+  title: { fontSize: 23, fontWeight: '700', color: COLORS.ink, marginTop: 7, lineHeight: 30 },
+  meta: { fontSize: 15, color: COLORS.inkSoft, marginTop: 9 },
+  period: { fontSize: 14, color: COLORS.inkSoft, marginTop: 7, opacity: 0.8 },
 
   divider: { height: 1, backgroundColor: COLORS.line, marginVertical: 20 },
 
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 13,
+    fontWeight: '700',
     color: COLORS.inkSoft,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    letterSpacing: 0.3,
+    marginBottom: 10,
   },
-  detail: { fontSize: 14, color: COLORS.ink, lineHeight: 22 },
-  criterion: { fontSize: 13.5, marginTop: 6 },
+  detail: { fontSize: 16, color: COLORS.ink, lineHeight: 24 },
+  criterion: { fontSize: 15.5, marginTop: 7, lineHeight: 21 },
   criterionMet: { color: COLORS.mint },
   criterionUnmet: { color: COLORS.coral },
+  perk: { fontSize: 15.5, color: COLORS.ink, marginTop: 7, lineHeight: 21 },
+  link: { fontSize: 15.5, color: COLORS.mint, fontWeight: '600', marginTop: 9, lineHeight: 21 },
 });

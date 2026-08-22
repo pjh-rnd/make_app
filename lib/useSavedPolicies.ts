@@ -1,13 +1,23 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { DEADLINES } from '@/data/deadlines';
-import { cancelDeadlineReminder, scheduleDeadlineReminder } from '@/lib/notifications';
+import { cancelDeadlineReminders, scheduleDeadlineReminders } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 
-type SavedRow = { policyId: string; notificationId: string | null };
+type SavedRow = { policyId: string; notificationIds: string[] };
 
-// 사용자가 "찜"한 정책들을 관리하는 훅. 찜 = 그 정책의 마감 알림도 같이 예약해두는 것.
-// saved_policies 테이블: user_id + policy_id 조합이 있으면 찜한 것, notification_id는 예약해둔 알림 id.
+// D-5/D-3/D-1 세 알림 id를 DB 컬럼 하나(notification_id, text)에 그대로 쉼표로 이어붙여서 저장함
+// — 원래 알림 1개짜리였던 컬럼이라 배열을 저장할 별도 컬럼이 없어서, 스키마를 안 건드리고
+// 이 컬럼 안에서 여러 개를 표현하는 방식으로 처리함
+function packIds(ids: string[]): string | null {
+  return ids.length > 0 ? ids.join(',') : null;
+}
+function unpackIds(packed: string | null): string[] {
+  return packed ? packed.split(',').filter(Boolean) : [];
+}
+
+// 사용자가 "찜"한 정책들을 관리하는 훅. 찜 = 그 정책의 마감 5일/3일/1일 전 알림도 같이 예약해두는 것.
+// saved_policies 테이블: user_id + policy_id 조합이 있으면 찜한 것, notification_id는 예약해둔 알림 id들(쉼표 구분).
 export function useSavedPolicies(userId: string | undefined) {
   const [saved, setSaved] = useState<Map<string, SavedRow>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -32,7 +42,7 @@ export function useSavedPolicies(userId: string | undefined) {
 
     const next = new Map<string, SavedRow>();
     for (const row of data ?? []) {
-      next.set(row.policy_id, { policyId: row.policy_id, notificationId: row.notification_id });
+      next.set(row.policy_id, { policyId: row.policy_id, notificationIds: unpackIds(row.notification_id) });
     }
     setSaved(next);
     setLoading(false);
@@ -40,19 +50,19 @@ export function useSavedPolicies(userId: string | undefined) {
     // 예전에 찜했지만 알림 기능이 생기기 전이라 notification_id가 비어있는 것들을 채워넣음
     // (혹은 재설치 등으로 예약이 날아갔을 때도 다시 잡아줌)
     for (const row of next.values()) {
-      if (row.notificationId) continue;
+      if (row.notificationIds.length > 0) continue;
       const policy = DEADLINES.find((d) => d.id === row.policyId);
       if (!policy) continue;
-      const notificationId = await scheduleDeadlineReminder(policy.title, policy.deadlineDate);
-      if (notificationId) {
+      const notificationIds = await scheduleDeadlineReminders(policy.title, policy.deadlineDate);
+      if (notificationIds.length > 0) {
         await supabase
           .from('saved_policies')
-          .update({ notification_id: notificationId })
+          .update({ notification_id: packIds(notificationIds) })
           .eq('user_id', userId)
           .eq('policy_id', row.policyId);
         setSaved((prev) => {
           const updated = new Map(prev);
-          updated.set(row.policyId, { policyId: row.policyId, notificationId });
+          updated.set(row.policyId, { policyId: row.policyId, notificationIds });
           return updated;
         });
       }
@@ -64,7 +74,7 @@ export function useSavedPolicies(userId: string | undefined) {
   }, [refresh]);
 
   // 찜/찜해제를 반대로 뒤집는 함수. 먼저 화면부터 바꾸고(낙관적 업데이트),
-  // 서버 요청이 실패하면 원래대로 되돌림. 찜하면 마감 하루 전 알림도 같이 예약됨.
+  // 서버 요청이 실패하면 원래대로 되돌림. 찜하면 마감 5일/3일/1일 전 알림이 같이 예약됨.
   async function toggle(policy: { id: string; title: string; deadlineDate: string }) {
     if (!userId) return;
     const existing = saved.get(policy.id);
@@ -76,7 +86,7 @@ export function useSavedPolicies(userId: string | undefined) {
         next.delete(policy.id);
         return next;
       });
-      if (existing?.notificationId) await cancelDeadlineReminder(existing.notificationId);
+      if (existing) await cancelDeadlineReminders(existing.notificationIds);
       const { error } = await supabase
         .from('saved_policies')
         .delete()
@@ -87,14 +97,14 @@ export function useSavedPolicies(userId: string | undefined) {
         setSaved((prev) => new Map(prev).set(policy.id, existing));
       }
     } else {
-      const notificationId = await scheduleDeadlineReminder(policy.title, policy.deadlineDate);
-      setSaved((prev) => new Map(prev).set(policy.id, { policyId: policy.id, notificationId }));
+      const notificationIds = await scheduleDeadlineReminders(policy.title, policy.deadlineDate);
+      setSaved((prev) => new Map(prev).set(policy.id, { policyId: policy.id, notificationIds }));
       const { error } = await supabase
         .from('saved_policies')
-        .insert({ user_id: userId, policy_id: policy.id, notification_id: notificationId });
+        .insert({ user_id: userId, policy_id: policy.id, notification_id: packIds(notificationIds) });
       if (error) {
         console.warn('[useSavedPolicies] 저장 실패:', error.message);
-        if (notificationId) await cancelDeadlineReminder(notificationId);
+        await cancelDeadlineReminders(notificationIds);
         setSaved((prev) => {
           const next = new Map(prev);
           next.delete(policy.id);
