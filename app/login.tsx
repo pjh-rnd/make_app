@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +15,13 @@ import {
 import { COLORS } from '@/constants/moa-colors';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
+
+// 로그인 전에 "이 앱이 뭘 해주는지" 짧게 보여주는 소개 문구 (빈 로그인폼만 보이는 게 아쉬워서 추가)
+const PITCH_ITEMS = [
+  { icon: '📅', text: 'D-day 캘린더로 마감 한눈에 확인' },
+  { icon: '🎯', text: '내 조건에 맞는 정책만 골라서 매칭' },
+  { icon: '🔔', text: '마감 하루 전 알림으로 놓치지 않게' },
+];
 
 export default function LoginScreen() {
   const { session, loading: sessionLoading } = useSession();
@@ -58,8 +66,18 @@ export default function LoginScreen() {
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
       <Text style={styles.brand}>Fit Me</Text>
       <Text style={styles.brandSub}>나에게 맞는 청년정책 캘린더</Text>
+
+      <View style={styles.pitchBox}>
+        {PITCH_ITEMS.map((item) => (
+          <View key={item.text} style={styles.pitchRow}>
+            <Text style={styles.pitchIcon}>{item.icon}</Text>
+            <Text style={styles.pitchText}>{item.text}</Text>
+          </View>
+        ))}
+      </View>
 
       <View style={styles.form}>
         <Text style={styles.label}>이메일</Text>
@@ -102,17 +120,14 @@ export default function LoginScreen() {
           </Text>
         </Pressable>
       </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: COLORS.paper,
-    padding: 24,
-    justifyContent: 'center',
-  },
+  screen: { flex: 1, backgroundColor: COLORS.paper },
+  scrollContent: { flexGrow: 1, padding: 24, justifyContent: 'center' },
   brand: { fontSize: 28, fontWeight: '700', color: COLORS.ink, textAlign: 'center' },
   brandSub: {
     fontSize: 12,
@@ -121,6 +136,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 32,
   },
+  pitchBox: { marginBottom: 28, gap: 10 },
+  pitchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pitchIcon: { fontSize: 16, width: 22, textAlign: 'center' },
+  pitchText: { fontSize: 13, color: COLORS.inkSoft, flex: 1 },
   form: {
     backgroundColor: COLORS.paperRaise,
     borderRadius: 16,
