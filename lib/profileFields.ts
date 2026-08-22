@@ -1,8 +1,36 @@
 import type { Profile } from '@/lib/useProfile';
 
-export type FieldType = 'text' | 'number' | 'date' | 'boolean' | 'money';
-export type FieldConfig = { key: keyof Profile; label: string; type: FieldType; placeholder?: string };
+export type FieldType = 'text' | 'number' | 'date' | 'boolean' | 'money' | 'picker';
+export type FieldConfig = {
+  key: keyof Profile;
+  label: string;
+  type: FieldType;
+  placeholder?: string;
+  options?: string[]; // type: 'picker'일 때만 씀
+};
 export type SectionConfig = { title: string; fields: FieldConfig[] };
+
+// 17개 광역 행정구역 — 자유 텍스트로 입력받으면 "서울"/"서울시"/"서울특별시"처럼 사람마다 다르게
+// 적어서 매칭이 실패하는 문제가 있었음. 시/도는 개수가 고정돼 있어서 선택형으로 바꿈.
+export const PROVINCE_OPTIONS = [
+  '서울특별시',
+  '부산광역시',
+  '대구광역시',
+  '인천광역시',
+  '광주광역시',
+  '대전광역시',
+  '울산광역시',
+  '세종특별자치시',
+  '경기도',
+  '강원특별자치도',
+  '충청북도',
+  '충청남도',
+  '전북특별자치도',
+  '전라남도',
+  '경상북도',
+  '경상남도',
+  '제주특별자치도',
+];
 
 // 큰 틀(SectionConfig) 5개 × 작은 틀(FieldConfig). edit-profile.tsx가 이 배열로 폼을 그리고,
 // index.tsx가 이 배열로 "몇 개 입력했는지" 완성도를 계산함 — 필드 하나 추가/삭제할 땐 여기만 고치면 됨.
@@ -14,7 +42,7 @@ export const SECTIONS: SectionConfig[] = [
       { key: 'birth_date', label: '생년월일', type: 'date', placeholder: 'YYYY-MM-DD' },
       { key: 'is_university_student', label: '대학생 여부', type: 'boolean' },
       { key: 'is_job_seeker', label: '취업준비생 여부', type: 'boolean' },
-      { key: 'region_province', label: '거주지 (시/도)', type: 'text', placeholder: '예: 서울특별시' },
+      { key: 'region_province', label: '거주지 (시/도)', type: 'picker', options: PROVINCE_OPTIONS },
       { key: 'region_city', label: '거주지 (시/군)', type: 'text', placeholder: '해당 없으면 비워두기' },
       { key: 'region_district', label: '거주지 (구)', type: 'text', placeholder: '예: 관악구' },
     ],

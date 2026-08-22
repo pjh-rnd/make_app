@@ -212,6 +212,23 @@ export default function EditProfileScreen() {
                           />
                           <Text style={styles.moneyUnit}>만원</Text>
                         </View>
+                      ) : f.type === 'picker' ? (
+                        <View style={styles.pickerRow}>
+                          {(f.options ?? []).map((option) => (
+                            <Pressable
+                              key={option}
+                              onPress={() => setField(f.key, option)}
+                              style={[styles.pickerChip, form[f.key] === option && styles.boolChipActive]}>
+                              <Text
+                                style={[
+                                  styles.boolChipText,
+                                  form[f.key] === option && styles.boolChipTextActive,
+                                ]}>
+                                {option}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
                       ) : (
                         <TextInput
                           style={styles.input}
@@ -320,6 +337,15 @@ const styles = StyleSheet.create({
   moneyUnit: { fontSize: 13, color: COLORS.inkSoft },
 
   boolRow: { flexDirection: 'row', gap: 8 },
+  pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  pickerChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 100,
+    backgroundColor: COLORS.paper,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
   boolChip: {
     paddingVertical: 8,
     paddingHorizontal: 18,
