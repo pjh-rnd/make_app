@@ -1,112 +1,101 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { Link } from 'expo-router';
+import { useCallback } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
+import { DEADLINES } from '@/data/deadlines';
+import { computeDday } from '@/lib/deadlineUtils';
+import { useSavedPolicies } from '@/lib/useSavedPolicies';
+import { useSession } from '@/lib/useSession';
 
-export default function TabTwoScreen() {
+// 찜한 정책만 모아보는 화면 (예전엔 Expo 기본 템플릿 화면이었음)
+export default function SavedScreen() {
+  const { session } = useSession();
+  const { savedIds, toggle: toggleSaved, refresh } = useSavedPolicies(session?.user.id);
+
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
+
+  const savedDeadlines = DEADLINES.filter((d) => savedIds.has(d.id));
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>찜한 정책</Text>
+      <Text style={styles.subtitle}>
+        하트 누른 정책들을 여기 모아뒀어요. 마감 하루 전엔 알림도 보내드려요.
+      </Text>
+
+      {savedDeadlines.length === 0 ? (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyIcon}>🤍</Text>
+          <Text style={styles.emptyText}>아직 찜한 정책이 없어요.{'\n'}홈 화면에서 하트를 눌러보세요.</Text>
+        </View>
+      ) : (
+        savedDeadlines.map((d) => {
+          const { label: ddayLabel, urgency } = computeDday(d.deadlineDate);
+          const dstyle = ddayStyle(urgency);
+          const catColor = CATEGORY_COLOR[d.categoryId];
+          return (
+            <View key={d.id} style={styles.cardWrap}>
+              <Link href={`/deadline/${d.id}`} asChild>
+                <Pressable style={styles.card}>
+                  <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
+                    <Text style={[styles.ddayText, { color: dstyle.text }]}>{ddayLabel}</Text>
+                  </View>
+                  <View style={styles.cardInfo}>
+                    <Text style={[styles.cardCat, { color: catColor }]}>{d.category}</Text>
+                    <Text style={styles.cardTitle}>{d.title}</Text>
+                    <Text style={styles.cardMeta}>{d.meta}</Text>
+                  </View>
+                </Pressable>
+              </Link>
+              <Pressable
+                onPress={() => toggleSaved({ id: d.id, title: d.title, deadlineDate: d.deadlineDate })}
+                hitSlop={10}
+                style={styles.heartButton}>
+                <Text style={styles.heartIcon}>❤️</Text>
+              </Pressable>
+            </View>
+          );
+        })
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
-  },
-  titleContainer: {
+  screen: { flex: 1, backgroundColor: COLORS.paper },
+  content: { padding: 20, paddingTop: 60, paddingBottom: 40 },
+
+  title: { fontSize: 24, fontWeight: '700', color: COLORS.ink },
+  subtitle: { fontSize: 12, color: COLORS.inkSoft, marginTop: 4, marginBottom: 24, lineHeight: 18 },
+
+  emptyBox: { alignItems: 'center', paddingVertical: 60 },
+  emptyIcon: { fontSize: 32, marginBottom: 10 },
+  emptyText: { fontSize: 13, color: COLORS.inkSoft, textAlign: 'center', lineHeight: 20 },
+
+  cardWrap: { position: 'relative', marginBottom: 10 },
+  card: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
+    backgroundColor: COLORS.paperRaise,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 14,
+    padding: 14,
+    paddingRight: 36,
   },
+  ddayBadge: { borderRadius: 8, paddingVertical: 5, paddingHorizontal: 9, alignSelf: 'flex-start' },
+  ddayText: { fontWeight: '700', fontSize: 13 },
+  cardInfo: { flex: 1 },
+  cardCat: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
+  cardTitle: { fontSize: 14, fontWeight: '600', color: COLORS.ink, marginTop: 3 },
+  cardMeta: { fontSize: 11.5, color: COLORS.inkSoft, marginTop: 4 },
+
+  heartButton: { position: 'absolute', top: 10, right: 10, padding: 4 },
+  heartIcon: { fontSize: 16 },
 });

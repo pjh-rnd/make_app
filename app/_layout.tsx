@@ -19,7 +19,6 @@ export default function RootLayout() {
         {/* 네이티브 헤더 대신 화면 안에서 직접 뒤로가기+제목을 그림 (iOS가 헤더 버튼에 자동으로
             씌우는 원형 배경이 계속 깜빡이는 문제가 있어서, 네이티브 헤더 자체를 안 씀) */}
         <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
