@@ -38,12 +38,25 @@ function mapRow(row: PolicyRow): Deadline {
   };
 }
 
+// 홈 화면, 검색 화면, 알림 화면, 상세 화면이 usePolicies()를 각자 따로 부르는데(기존 useProfile/
+// useSavedPolicies 훅들과 같은 패턴), 화면 이동할 때마다(useFocusEffect로 매번 refresh 호출) 매번
+// Supabase를 새로 왕복하면 그때마다 ~1초 정도 로딩 지연이 눈에 보임 — 특히 홈 화면에서 이미
+// 받아온 데이터를 검색 화면 들어갈 때 또 처음부터 기다리는 게 어색했음(2026-08-23 사용자 피드백).
+// 그래서 모듈 스코프(컴포넌트 밖, 앱 전체에서 공유됨)에 마지막으로 받아온 데이터를 캐시해두고,
+// 캐시가 있으면 그걸 먼저 즉시 보여준 다음(로딩 화면 없이) 최신 데이터를 조용히 백그라운드에서
+// 다시 받아와서 갱신함 — 첫 진입(앱을 막 켰을 때)만 실제로 기다리고, 그 뒤로는 화면을 옮겨다녀도
+// 바로바로 보임.
+let cachedPolicies: Deadline[] | null = null;
+
 export function usePolicies() {
-  const [policies, setPolicies] = useState<Deadline[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [policies, setPolicies] = useState<Deadline[]>(cachedPolicies ?? []);
+  const [loading, setLoading] = useState(cachedPolicies === null);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
+    // 캐시가 있으면 로딩 상태 없이 기존 데이터를 그대로 유지한 채 백그라운드에서만 갱신함
+    if (cachedPolicies === null) {
+      setLoading(true);
+    }
     // PostgREST 기본 응답 상한이 1000행이라, 지금(500여 건)보다 데이터가 꽤 늘어나도 한 번에
     // 다 받아오게 넉넉히 range를 지정해둠(2000행까지)
     const { data, error } = await supabase
@@ -58,7 +71,9 @@ export function usePolicies() {
       return;
     }
 
-    setPolicies((data ?? []).map(mapRow));
+    const mapped = (data ?? []).map(mapRow);
+    cachedPolicies = mapped;
+    setPolicies(mapped);
     setLoading(false);
   }, []);
 
