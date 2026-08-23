@@ -3,9 +3,9 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 
 import { HeaderBackButton } from '@/components/header-back-button';
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
-import { DEADLINES } from '@/data/deadlines';
 import { computeDday, formatMonthDay } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
+import { usePolicies } from '@/lib/usePolicies';
 import { useProfile } from '@/lib/useProfile';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { useSession } from '@/lib/useSession';
@@ -13,17 +13,23 @@ import { useSession } from '@/lib/useSession';
 export default function DeadlineDetailScreen() {
   // URL의 [id] 부분이 여기로 들어옴 (예: /deadline/happy-housing -> id === 'happy-housing')
   const { id } = useLocalSearchParams<{ id: string }>();
-  const item = DEADLINES.find((d) => d.id === id);
+  const { policies, loading: policiesLoading } = usePolicies();
+  const item = policies.find((d) => d.id === id);
 
   const { session } = useSession();
   const { profile } = useProfile(session?.user.id);
-  const { savedIds, toggle: toggleSaved } = useSavedPolicies(session?.user.id);
+  const { savedIds, toggle: toggleSaved } = useSavedPolicies(session?.user.id, policies);
 
   if (!item) {
     return (
       <View style={styles.screen}>
         <ScreenHeader title="정책 상세" />
-        <Text style={styles.notFound}>해당 정책을 찾을 수 없어요.</Text>
+        {/* Supabase에서 policies를 아직 불러오는 중일 수 있어서(비동기), 로딩 중과 진짜
+            "없는 정책"을 구분해서 보여줌 — 안 그러면 데이터 오는 짧은 순간 "못 찾음" 문구가
+            잠깐 번쩍이는 것처럼 보임 */}
+        <Text style={styles.notFound}>
+          {policiesLoading ? '불러오는 중...' : '해당 정책을 찾을 수 없어요.'}
+        </Text>
       </View>
     );
   }
@@ -59,7 +65,9 @@ export default function DeadlineDetailScreen() {
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.meta}>{item.meta}</Text>
         <Text style={styles.period}>
-          신청기간 {formatMonthDay(item.startDate)} ~ {formatMonthDay(item.deadlineDate)}
+          {phase === 'rolling'
+            ? '상시 접수 · 신청 기간이 정해져 있지 않아요'
+            : `신청기간 ${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`}
         </Text>
 
         <View style={styles.divider} />

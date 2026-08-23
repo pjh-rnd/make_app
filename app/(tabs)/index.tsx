@@ -3,7 +3,7 @@ import { Link, router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { DeadlineCard } from '@/components/deadline-card';
+import { DeadlineCard, type DeadlineWithMatch } from '@/components/deadline-card';
 import { FitMeLogo } from '@/components/fit-me-logo';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
@@ -13,10 +13,10 @@ import {
   CATEGORY_ORDER,
   COLORS,
 } from '@/constants/moa-colors';
-import { DEADLINES } from '@/data/deadlines';
 import { buildMonthGrid, groupDeadlinesByDay, WEEKDAYS } from '@/lib/calendarUtils';
 import { computeDday } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
+import { usePolicies } from '@/lib/usePolicies';
 import { usePolicySaveCounts } from '@/lib/usePolicySaveCounts';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { useProfile } from '@/lib/useProfile';
@@ -25,13 +25,9 @@ import { useSession } from '@/lib/useSession';
 // 검색 화면(app/search.tsx)의 인기순/지원 가능순 토글과 똑같이 서로 독립적인 체크박스형
 // 토글임(배타적이지 않음) — 둘 다 켜면 검색 화면과 동일하게 인기순이 먼저 적용되고, 그 안에서
 // 동점일 때만 지원 가능순으로 다시 나뉨. 둘 다 꺼져있으면 기본값(마감순)
-function sortHomeList<T extends { id: string; deadlineDate: string; match: { criteria: { met: boolean }[] } }>(
-  items: T[],
-  popular: boolean,
-  eligible: boolean,
-  saveCounts: Map<string, number>,
-  closed = false
-): T[] {
+function sortHomeList<
+  T extends { id: string; deadlineDate: string | null; match: { criteria: { met: boolean }[] } },
+>(items: T[], popular: boolean, eligible: boolean, saveCounts: Map<string, number>, closed = false): T[] {
   return [...items].sort((a, b) => {
     if (popular) {
       const aCount = saveCounts.get(a.id) ?? 0;
@@ -43,6 +39,10 @@ function sortHomeList<T extends { id: string; deadlineDate: string; match: { cri
       const bUnmet = b.match.criteria.filter((c) => !c.met).length;
       if (aUnmet !== bUnmet) return aUnmet - bUnmet;
     }
+    // 상시모집(deadlineDate 없음)은 날짜 비교가 의미 없어서 항상 맨 뒤로 보냄
+    if (a.deadlineDate == null && b.deadlineDate == null) return 0;
+    if (a.deadlineDate == null) return 1;
+    if (b.deadlineDate == null) return -1;
     if (closed) {
       return a.deadlineDate > b.deadlineDate ? -1 : a.deadlineDate < b.deadlineDate ? 1 : 0;
     }
@@ -78,19 +78,23 @@ export default function HomeScreen() {
 
   const { session } = useSession();
   const { profile, refresh: refreshProfile } = useProfile(session?.user.id);
+  const { policies, refresh: refreshPolicies } = usePolicies();
   const { savedIds, toggle: toggleSaved, refresh: refreshSaved } = useSavedPolicies(
-    session?.user.id
+    session?.user.id,
+    policies
   );
   const { counts: saveCounts, refresh: refreshSaveCounts } = usePolicySaveCounts();
 
-  // 이 화면에 다시 돌아올 때마다(수정 화면·상세페이지에서 뒤로 왔을 때 등) 최신 프로필/찜 목록을 다시 불러옴
-  // (상세페이지에서 찜했는데 리스트가 예전 상태를 들고 있으면, 다시 찜하려다 "이미 있음" 에러로 안 눌리는 것처럼 보임)
+  // 이 화면에 다시 돌아올 때마다(수정 화면·상세페이지에서 뒤로 왔을 때 등) 최신 프로필/정책/찜 목록을
+  // 다시 불러옴(상세페이지에서 찜했는데 리스트가 예전 상태를 들고 있으면, 다시 찜하려다 "이미 있음"
+  // 에러로 안 눌리는 것처럼 보임)
   useFocusEffect(
     useCallback(() => {
       refreshProfile();
+      refreshPolicies();
       refreshSaved();
       refreshSaveCounts();
-    }, [refreshProfile, refreshSaved, refreshSaveCounts])
+    }, [refreshProfile, refreshPolicies, refreshSaved, refreshSaveCounts])
   );
 
   const hasProfile = !!(
@@ -162,14 +166,14 @@ export default function HomeScreen() {
   // 달력 점도 관심분야 칩으로 필터링함 — 칩을 꺼도 점 색깔이 그대로면 "필터가 안 먹힌다"고
   // 오해하기 쉬워서, 켜진 카테고리의 점만 찍히게 함
   const deadlineDays = groupDeadlinesByDay(
-    DEADLINES.filter((d) => activeIds.includes(d.categoryId) && savedIds.has(d.id)),
+    policies.filter((d) => activeIds.includes(d.categoryId) && savedIds.has(d.id)),
     viewYear,
     viewMonth
   );
 
   // 찜한 것 중에서 관심분야 칩으로 다시 좁혀나감 (날짜 선택도 이 목록엔 영향 안 줌 — 날짜를
   // 선택하면 관심분야+찜 기준에 한해 "그 날 시작하는 공고"를 아래에 따로 보여주기 때문)
-  const filteredDeadlines = DEADLINES.filter(
+  const filteredDeadlines = policies.filter(
     (d) => activeIds.includes(d.categoryId) && savedIds.has(d.id)
   );
 
@@ -179,22 +183,27 @@ export default function HomeScreen() {
     match: calculateMatch(profile, d.requirements),
   }));
 
-  // computeDday의 phase 3단계(시작 전/진행 중/마감 후)에 그대로 맞춰서 세 섹션으로 나눔 —
+  // computeDday의 phase에 그대로 맞춰서 세 섹션으로 나눔 —
   // "진행 중"(지금 신청 가능)·"예정"(아직 신청 시작 전)·"마감"(끝난 것, 기본은 접힌 상태).
+  // 상시모집(phase: 'rolling')은 "언제든 신청 가능"이라는 점에서 진행 중과 같은 성격이라
+  // 진행 중 섹션에 같이 넣음(2026-08-23, 실제 데이터 연동하면서 추가된 phase).
   // 사용자가 고른 인기순/지원 가능순 토글(homeSortPopular/homeSortEligible)을 그대로 적용함
-  const activeDeadlines = sortHomeList(
-    deadlinesWithMatch.filter((d) => computeDday(d.startDate, d.deadlineDate).phase === 'active'),
+  const activeDeadlines = sortHomeList<DeadlineWithMatch>(
+    deadlinesWithMatch.filter((d) => {
+      const phase = computeDday(d.startDate, d.deadlineDate).phase;
+      return phase === 'active' || phase === 'rolling';
+    }),
     homeSortPopular,
     homeSortEligible,
     saveCounts
   );
-  const beforeDeadlines = sortHomeList(
+  const beforeDeadlines = sortHomeList<DeadlineWithMatch>(
     deadlinesWithMatch.filter((d) => computeDday(d.startDate, d.deadlineDate).phase === 'before'),
     homeSortPopular,
     homeSortEligible,
     saveCounts
   );
-  const closedDeadlines = sortHomeList(
+  const closedDeadlines = sortHomeList<DeadlineWithMatch>(
     deadlinesWithMatch.filter((d) => computeDday(d.startDate, d.deadlineDate).phase === 'closed'),
     homeSortPopular,
     homeSortEligible,
@@ -207,19 +216,22 @@ export default function HomeScreen() {
   const selectedDayDeadlines =
     selectedDay === null
       ? []
-      : DEADLINES.filter((d) => {
-          if (!activeIds.includes(d.categoryId) || !savedIds.has(d.id)) return false;
-          const dt = new Date(d.startDate);
-          return (
-            dt.getFullYear() === viewYear &&
-            dt.getMonth() === viewMonth &&
-            dt.getDate() === selectedDay
-          );
-        }).map((d) => ({ ...d, match: calculateMatch(profile, d.requirements) }));
+      : policies
+          .filter((d) => {
+            if (!activeIds.includes(d.categoryId) || !savedIds.has(d.id)) return false;
+            if (!d.startDate) return false; // 상시모집은 특정 날짜가 없어서 날짜별 목록엔 안 잡힘(달력 점도 안 찍힘)
+            const dt = new Date(d.startDate);
+            return (
+              dt.getFullYear() === viewYear &&
+              dt.getMonth() === viewMonth &&
+              dt.getDate() === selectedDay
+            );
+          })
+          .map((d) => ({ ...d, match: calculateMatch(profile, d.requirements) }));
   // 날짜 선택 시에도 진행 중/예정과 똑같은 인기순/지원 가능순 토글을 씀
   const selectedDayGroups = CATEGORY_ORDER.map((catId) => ({
     catId,
-    items: sortHomeList(
+    items: sortHomeList<DeadlineWithMatch>(
       selectedDayDeadlines.filter((d) => d.categoryId === catId),
       homeSortPopular,
       homeSortEligible,

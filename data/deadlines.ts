@@ -1,13 +1,38 @@
-// 아직 Supabase 연동 전이라, 화면 모양만 먼저 보려고 가짜 데이터를 그대로 씀 (Phase 3 목표)
+// 2026-08-23부로 앱은 이 mock을 더 이상 안 씀 — 실제 데이터는 lib/usePolicies.ts가 Supabase
+// public.policies 테이블(온통청년 API에서 scripts/syncYouthPolicies.js로 동기화)에서 읽어옴.
+// 이 파일은 오프라인 참고/수동 테스트용 예시 데이터로만 남겨둠(삭제는 안 함 — perks/links 채운
+// 예시가 실제 정책 상세 화면 디자인 참고용으로 여전히 쓸모 있어서).
+//
 // id는 상세 화면(app/deadline/[id].tsx)으로 이동할 때 URL 파라미터로 씀
 // requirements는 매칭률 계산(lib/matching.ts)에 쓰는 자격 조건
 // (금액은 만원 단위. maxPersonalMonthlyIncome 값은 실제 기준중위소득표를 반영한 게 아니라 예시로 대략 잡은 금액입니다)
 // startDate: 신청 시작일('YYYY-MM-DD'). 캘린더 점은 이 날짜 기준으로만 한 번 찍음 — 마감일까지
 // 매일 점이 찍히면 "매일 뭔가 있다"처럼 보여서 헷갈리기 때문에, 시작일 하루에만 표시함.
 // deadlineDate: 실제 마감 날짜. D-day 배지/알림 예약은 전부 이 날짜에서 계산함 (lib/deadlineUtils.ts)
+// 둘 다 null이면 "상시모집"(신청 기간이 정해져 있지 않은 정책) — 실제 Supabase 데이터에만 있는
+// 케이스라 이 mock엔 없지만, 타입은 다른 데이터 소스와 맞춰 nullable로 선언해둠.
 // 8~9월은 하루 2건씩 더미 공고를 채워서(총 122건) 마감일 기준으로는 매일 뭔가 있지만,
 // 시작일 기준 캘린더에서는 흩어져 보임. 같은 정책 템플릿이 재사용된 곳은 제목 끝에 '2차/3차/추가 모집'을 붙여 구분함.
-const RAW_DEADLINES = [
+import type { Requirements } from '@/lib/matching';
+
+// lib/usePolicies.ts(실제 Supabase 데이터)와 이 mock이 항상 같은 모양을 갖도록 명시적으로
+// 선언함 — 예전엔 `(typeof DEADLINES)[number]`로 데이터에서 타입을 추론했는데, 그러면 다른
+// 데이터 소스가 똑같은 타입을 따르는지 컴파일러가 확인해줄 수가 없었음
+export type Deadline = {
+  id: string;
+  startDate: string | null;
+  deadlineDate: string | null;
+  categoryId: string;
+  category: string;
+  title: string;
+  meta: string;
+  detail: string;
+  requirements: Requirements;
+  perks: string[];
+  links: { label: string; url: string }[];
+};
+
+const RAW_DEADLINES: Deadline[] = [
   {
     id: "housing-2026-08-01-0",
     startDate: "2026-07-22",
@@ -1631,7 +1656,8 @@ const RAW_DEADLINES = [
 // "마감" 섹션, 검색 결과, 찜한 정책, 알림 등 DEADLINES를 쓰는 모든 화면에 한 번에 적용됨.
 // "오늘" 기준으로 매번 다시 계산하는 거라, 앱을 다시 열 때마다 2주 지난 게 하나씩 더 걸러짐.
 const EXPIRY_WINDOW_DAYS = 14;
-function isWithinExpiryWindow(deadlineDate: string): boolean {
+function isWithinExpiryWindow(deadlineDate: string | null): boolean {
+  if (!deadlineDate) return true; // 상시모집(마감일 없음)은 항상 보여줌
   const deadline = new Date(deadlineDate);
   deadline.setHours(0, 0, 0, 0);
   const today = new Date();
@@ -1641,5 +1667,3 @@ function isWithinExpiryWindow(deadlineDate: string): boolean {
 }
 
 export const DEADLINES = RAW_DEADLINES.filter((d) => isWithinExpiryWindow(d.deadlineDate));
-
-export type Deadline = (typeof DEADLINES)[number];

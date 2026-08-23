@@ -66,8 +66,12 @@ export function DeadlineCard({
           </View>
           <Text style={styles.title}>{item.title}</Text>
           <Text style={styles.meta}>{item.meta}</Text>
+          {/* 상시모집(phase==='rolling')은 startDate/deadlineDate가 둘 다 null이라 날짜를 못 보여주고,
+              대신 "언제든 신청 가능"이라는 걸 알려줌 */}
           <Text style={styles.period}>
-            신청 {formatMonthDay(item.startDate)} 시작 · {formatMonthDay(item.deadlineDate)} 마감
+            {phase === 'rolling'
+              ? '상시 접수 중 · 언제든 신청 가능해요'
+              : `신청 ${formatMonthDay(item.startDate!)} 시작 · ${formatMonthDay(item.deadlineDate!)} 마감`}
           </Text>
         </View>
       </Pressable>

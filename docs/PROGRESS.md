@@ -170,10 +170,10 @@
   14일 지난 건 자동으로 화면에서 숨김(로드할 때마다 오늘 날짜 기준 재계산).
 - 일부 대표 항목(카테고리별 5개 정도)에 `perks`(이런 점이 좋아요!)/`links`(관련 링크) 필드 채움,
   나머진 비어있음.
-- **앱은 아직 이 mock을 그대로 씀 — 아래 11번 항목이 "진짜 데이터는 준비됐지만 앱이 아직 안 갈아탄"
-  상태를 설명함.**
+- **2026-08-23부로 앱은 더 이상 이 mock을 안 씀** — 아래 11번(데이터 파이프라인)·12번(앱 연결)
+  항목이 실제 Supabase 데이터로 넘어간 과정을 설명함. 이 파일은 오프라인 참고용으로만 남음.
 
-### 11. 실제 온통청년 데이터 파이프라인 (Phase 3, 2026-08-23 — 절반 완료)
+### 11. 실제 온통청년 데이터 파이프라인 (Phase 3, 2026-08-23 — 완료)
 
 **끝난 것: 실제 데이터를 Supabase에 채워넣는 파이프라인.**
 - [supabase/policies.sql](../supabase/policies.sql) — 새 `public.policies` 테이블. `saved_policies`/
@@ -216,15 +216,34 @@
   - **최종 실행 결과(2026-08-23)**: 2,728건 수신 → 필터 후 **517건 저장** (상시모집은 money 9건만).
     카테고리 분포: job 169 / welfare 131 / edu 82 / participation 62 / housing 60 / money 13.
 
-**아직 안 끝난 것: 앱 화면을 이 `policies` 테이블에 연결하는 것.** 지금 앱은 여전히
-`data/deadlines.ts`의 하드코딩 mock을 그대로 읽음. 연결하려면 최소 이런 변경이 필요함:
-- `startDate`/`deadlineDate`를 다루는 ~10개 파일(`app/(tabs)/index.tsx`, `app/search.tsx`,
-  `app/deadline/[id].tsx`, `app/notifications.tsx`, `lib/calendarUtils.ts`, `lib/deadlineUtils.ts`,
-  `components/deadline-card.tsx` 등)이 전부 "두 날짜가 항상 존재한다"고 가정하고 있어서, 상시모집
-  (`is_rolling`, 날짜 null)을 위한 새 phase/배지("상시모집")를 추가하고 nullable 날짜를 다뤄야 함.
-  캘린더 점 찍기·정렬(`sortHomeList` 등)도 null 날짜 케이스를 처리해야 함.
-- 하드코딩 배열 대신 Supabase `policies`를 읽는 새 훅(예: `lib/usePolicies.ts`)이 필요함.
-- 이건 이번 세션에서 손 안 댐 — 다음에 이어서 할 큰 작업으로 남겨둠.
+### 12. 앱 화면을 `policies` 테이블에 실제로 연결 (2026-08-23, 완료)
+
+`lib/usePolicies.ts`(새 훅, Supabase `policies` 테이블을 camelCase `Deadline` 타입으로 매핑해서
+읽어옴)를 만들고, `data/deadlines.ts`의 하드코딩 mock을 쓰던 화면 전부를 이 훅으로 교체함:
+`app/(tabs)/index.tsx`, `app/search.tsx`, `app/deadline/[id].tsx`, `app/notifications.tsx`,
+`lib/useSavedPolicies.ts`(알림 재예약 백필용 lookup). `data/deadlines.ts`는 삭제하지 않고 오프라인
+참고/디자인 샘플용으로만 남겨둠(더 이상 어디서도 import 안 함).
+
+- **상시모집(nullable 날짜) 지원**: `lib/deadlineUtils.ts`의 `Phase`에 `'rolling'` 추가,
+  `computeDday(startDate, deadlineDate)`가 둘 다 null이면 `{label:'상시모집', phase:'rolling'}` 반환.
+  `constants/moa-colors.ts`의 `ddayStyle`에 주황 계열 배지 추가. `lib/calendarUtils.ts`는 startDate가
+  null이면 그냥 건너뜀(달력 점 안 찍힘). 홈 화면은 rolling을 "진행 중" 섹션에 합침(언제든 신청
+  가능하다는 점에서 성격이 같음). 정렬 로직(`sortHomeList`, 검색 화면 comparator)은 날짜 없는 항목을
+  항상 맨 뒤로 보냄. `DeadlineCard`/상세 화면은 날짜 대신 "상시 접수 중" 문구를 보여줌.
+- **`Deadline` 타입을 명시적으로 선언**(`data/deadlines.ts`) — 예전엔 mock 배열에서
+  `(typeof DEADLINES)[number]`로 타입을 추론했는데, 그러면 Supabase가 이 타입을 따르는지 컴파일러가
+  확인해줄 수 없어서 명시적 타입으로 바꿈(`startDate`/`deadlineDate: string | null` 포함).
+- **검색 화면에 안내 문구 추가**: "마감 2주 이내 · 시작 1달 이내인 공고만 모아봤어요" — 동기화
+  단계에서 이미 걸러서 저장하기 때문에 검색해도 그 범위 밖은 애초에 안 나온다는 걸 알려줌.
+- **화면당 개별 fetch**: `useProfile`/`useSavedPolicies` 등 기존 훅들과 같은 패턴을 따라서
+  `usePolicies()`도 화면마다(index/search/notifications/deadline detail) 독립적으로 호출함(전역
+  캐시/컨텍스트 없음) — 화면 진입마다 새로 Supabase에서 읽어옴. 로딩 스피너는 따로 안 넣었고(기존
+  훅들도 다 그런 패턴이라 일관성 유지), 데이터 오기 전엔 빈 배열이라 각 섹션의 "~없어요" 문구가
+  잠깐 보였다 채워지는 정도.
+
+**다음 계획(사용자 지시): 자동 재동기화 스케줄링(cron)은 이 연결 작업이 끝난 지금부터 착수.**
+지금은 `npm run sync-policies`를 수동으로 돌려야만 최신 상태가 됨 — Supabase pg_cron이나
+GitHub Actions 같은 걸로 매일 자동 실행되게 만드는 게 다음 작업.
 
 ## 지금까지 근본 원인까지 찾아서 고친 버그들
 
@@ -253,10 +272,12 @@
   데이터만 지우고 로그아웃함.
 - [ ] "내가 지원한 공고"/커뮤니티(내가 쓴 글/댓글) — 전부 UI만 있고 "준비 중" placeholder.
 - [x] ~~2탭 vs 3탭 구조 최종 결정~~ — 2026-08-23, **2탭(홈+전체)으로 확정**하고 `main`에 전부 머지 완료.
-- [~] 실제 공공 API(온통청년 등) 연동해서 mock 데이터 교체 — **절반 완료(2026-08-23)**. 실제 데이터를
-  Supabase `policies` 테이블에 넣는 파이프라인(`supabase/policies.sql` + `npm run sync-policies`)은
-  끝났고 1,268건 실제로 들어가있음. **남은 절반: 앱 화면이 아직 이걸 안 읽고 여전히
-  `data/deadlines.ts` mock을 씀** — 상세는 위 10번 항목과 [[youthcenter-api-key-renewal]] 참고.
+- [x] ~~실제 공공 API(온통청년 등) 연동해서 mock 데이터 교체~~ — **2026-08-23 완료**. Supabase
+  `policies` 파이프라인(`npm run sync-policies`, 현재 517건) + 앱 화면 전부(`lib/usePolicies.ts`)
+  연결까지 끝남. 상세는 위 11·12번 항목과 [[youthcenter-api-key-renewal]] 참고.
+- [ ] **자동 재동기화 스케줄링(cron)** — 지금은 `npm run sync-policies`를 수동으로 돌려야만 최신
+  상태가 됨. 앱 연결까지 끝났으니 사용자 지시로 다음 작업으로 예정(Supabase pg_cron 또는
+  GitHub Actions 등으로 매일 자동 실행되게 만들 것).
 
 ## 관련 메모리 파일
 

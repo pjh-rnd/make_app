@@ -11,9 +11,9 @@ import {
   CATEGORY_ORDER,
   COLORS,
 } from '@/constants/moa-colors';
-import { DEADLINES } from '@/data/deadlines';
 import { computeDday } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
+import { usePolicies } from '@/lib/usePolicies';
 import { usePolicySaveCounts } from '@/lib/usePolicySaveCounts';
 import { useProfile } from '@/lib/useProfile';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
@@ -28,17 +28,20 @@ import { useSession } from '@/lib/useSession';
 export default function SearchScreen() {
   const { session } = useSession();
   const { profile, refresh: refreshProfile } = useProfile(session?.user.id);
+  const { policies, refresh: refreshPolicies } = usePolicies();
   const { savedIds, toggle: toggleSaved, refresh: refreshSaved } = useSavedPolicies(
-    session?.user.id
+    session?.user.id,
+    policies
   );
   const { counts: saveCounts, refresh: refreshSaveCounts } = usePolicySaveCounts();
 
   useFocusEffect(
     useCallback(() => {
       refreshProfile();
+      refreshPolicies();
       refreshSaved();
       refreshSaveCounts();
-    }, [refreshProfile, refreshSaved, refreshSaveCounts])
+    }, [refreshProfile, refreshPolicies, refreshSaved, refreshSaveCounts])
   );
 
   const hasProfile = !!(
@@ -87,8 +90,8 @@ export default function SearchScreen() {
   // 검색어가 비어있으면 텍스트 필터링 없이 전체 공고를 다 보여줌(빈칸 상태로 열려도 뭐라도 보이게)
   const searchResults = (
     trimmedQuery === ''
-      ? DEADLINES
-      : DEADLINES.filter(
+      ? policies
+      : policies.filter(
           (d) =>
             d.title.includes(trimmedQuery) ||
             d.category.includes(trimmedQuery) ||
@@ -126,10 +129,17 @@ export default function SearchScreen() {
     if (aClosed !== bClosed) return aClosed ? 1 : -1;
 
     // 마감된 공고끼리는 "최근에 마감된 것 → 오래전에 마감된 것" 순(내림차순)으로,
-    // 그 외(진행 중·예정)는 마감일 빠른 순(오름차순)으로 정렬함
+    // 그 외(진행 중·예정·상시모집)는 마감일 빠른 순(오름차순)으로 정렬함.
+    // 상시모집(deadlineDate 없음)은 phase !== 'closed'라 이 블록으로 오는데, 날짜 비교가 의미
+    // 없어서 그 안에서는 항상 맨 뒤로 보냄(aClosed/bClosed가 true면 computeDday 로직상
+    // deadlineDate가 항상 있는 게 보장되지만, 아래 분기는 non-null임을 타입스크립트가 몰라서
+    // 그 경우엔 단언(!)을 씀)
     if (aClosed && bClosed) {
-      return a.deadlineDate > b.deadlineDate ? -1 : a.deadlineDate < b.deadlineDate ? 1 : 0;
+      return a.deadlineDate! > b.deadlineDate! ? -1 : a.deadlineDate! < b.deadlineDate! ? 1 : 0;
     }
+    if (a.deadlineDate == null && b.deadlineDate == null) return 0;
+    if (a.deadlineDate == null) return 1;
+    if (b.deadlineDate == null) return -1;
     return a.deadlineDate < b.deadlineDate ? -1 : a.deadlineDate > b.deadlineDate ? 1 : 0;
   });
 
@@ -222,6 +232,13 @@ export default function SearchScreen() {
           </Pressable>
         </ScrollView>
       </View>
+
+      {/* scripts/syncYouthPolicies.js가 온통청년 API에서 데이터를 가져올 때 이미 이 기간
+          기준으로 걸러서 Supabase에 저장하기 때문에(너무 많아서), 검색해도 이 범위 밖의 공고는
+          애초에 목록에 없음 — 사용자가 "왜 이것밖에 안 나오지?" 헷갈리지 않게 안내해둠 */}
+      <Text style={styles.syncWindowHint}>
+        마감 2주 이내 · 시작 1달 이내인 공고만 모아봤어요
+      </Text>
 
       {/* keyboardShouldPersistTaps="handled" — 이게 없으면 키보드가 떠있는 상태에서 카드를 눌렀을 때
           첫 탭은 키보드만 내려가고(터치가 카드까지 안 전달됨) 한 번 더 눌러야 이동되는 문제가 있음 */}
@@ -320,6 +337,16 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: COLORS.mint, borderColor: COLORS.mint },
   chipText: { fontSize: 13.7, color: COLORS.inkSoft },
   chipTextActive: { color: '#FFFFFF', fontWeight: '600' },
+
+  // 홈 화면 calendarHint와 같은 톤(작고 흐릿한 안내 문구)으로 맞춤
+  syncWindowHint: {
+    fontSize: 11,
+    color: COLORS.inkSoft,
+    textAlign: 'center',
+    opacity: 0.7,
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
 
   content: { padding: 20, paddingBottom: 40 },
   emptyText: { fontSize: 13, color: COLORS.inkSoft, marginTop: 8 },

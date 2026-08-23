@@ -68,13 +68,16 @@ export const CATEGORY_ICON: Record<string, string> = {
   participation: '🙋',
 };
 
-// phase(시작 전/진행 중/마감 후)에 따라 D-day 배지 배경/글자색을 다르게 주는 함수
+// phase(시작 전/진행 중/마감 후/상시모집)에 따라 D-day 배지 배경/글자색을 다르게 주는 함수
 // - before(시작 전): 파스텔 보라색 — closed(마감 후)와 똑같은 회색이라 구분이 안 됐어서,
 //   "시작 D-n"은 밝은 보라 계열로 따로 구분되게 함
 // - active(진행 중): 파스텔 연두색 — 지금 신청 가능하다는 걸 긍정적인 색으로
 // - closed(마감 후): 그냥 회색 — 더 이상 의미 없는 상태
+// - rolling(상시모집, 2026-08-23 추가): 파스텔 주황색 — "지금 신청 가능"이라는 점에서 active와
+//   비슷하게 긍정적이지만, 마감이 정해진 active와는 다른 상태라는 걸 색으로도 구분되게 함
 export function ddayStyle(phase: string) {
   if (phase === 'before') return { bg: COLORS.violetSoft, text: COLORS.violet };
   if (phase === 'active') return { bg: COLORS.limeSoft, text: COLORS.lime };
+  if (phase === 'rolling') return { bg: COLORS.amberSoft, text: COLORS.amber };
   return { bg: COLORS.closedGraySoft, text: COLORS.closedGray };
 }

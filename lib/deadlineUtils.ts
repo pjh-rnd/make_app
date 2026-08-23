@@ -1,7 +1,9 @@
-// 배지 색을 정할 때 쓰는 3단계 상태 — "시작 전 / 진행 중 / 마감 후". 예전엔 마감까지 남은
+// 배지 색을 정할 때 쓰는 상태 — "시작 전 / 진행 중 / 마감 후 / 상시모집". 예전엔 마감까지 남은
 // 날짜로만 긴급도(urgent/soon/later)를 나눴는데, 시작일이 생기면서 "아직 시작도 안 했는데
-// 급하다고 빨갛게 보이는" 게 이상해서, 지금은 이 세 단계로만 색을 나눔.
-export type Phase = 'before' | 'active' | 'closed';
+// 급하다고 빨갛게 보이는" 게 이상해서, 지금은 이 단계로만 색을 나눔.
+// 'rolling'(상시모집)은 2026-08-23 실제 온통청년 데이터 연동하면서 추가됨 — 신청 기간이
+// 정해져 있지 않은 정책(청년주택드림청약통장처럼 항상 가입 가능한 상품 등)이 실제로 있어서.
+export type Phase = 'before' | 'active' | 'closed' | 'rolling';
 
 function toMidnight(dateStr: string): Date {
   const d = new Date(dateStr);
@@ -16,10 +18,17 @@ function daysBetween(a: Date, b: Date): number {
 // 시작일·마감일에서 "시작 D-9" / "마감 D-9" 같은 표시 문구와 상태(phase)를 계산함.
 // 예전엔 dday를 mock 데이터에 직접 박아뒀는데, 그러면 오늘 날짜가 지나도 안 바뀌고 그대로
 // 남아있어서 늘 최신 상태를 유지하려면 실제 날짜에서 매번 계산해야 함.
+// - 상시모집(startDate/deadlineDate 둘 다 null): "상시모집" — 신청 기간이 정해져 있지 않음
 // - 시작 전(today < startDate): "시작 D-n" — 신청이 아직 안 열렸다는 뜻
 // - 진행 중(startDate <= today <= deadlineDate): "마감 D-n" — 지금 신청 가능, 마감까지 며칠
 // - 마감 후(today > deadlineDate): "마감"
-export function computeDday(startDate: string, deadlineDate: string): { label: string; phase: Phase } {
+export function computeDday(
+  startDate: string | null,
+  deadlineDate: string | null
+): { label: string; phase: Phase } {
+  if (!startDate || !deadlineDate) {
+    return { label: '상시모집', phase: 'rolling' };
+  }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = toMidnight(startDate);

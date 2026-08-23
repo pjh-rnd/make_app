@@ -3,7 +3,9 @@
 
 import { CATEGORY_ORDER } from '@/constants/moa-colors';
 
-export type DeadlineLike = { startDate: string; categoryId: string };
+// startDate가 null인 건 "상시모집"(신청 기간이 정해져 있지 않은 정책, 2026-08-23 추가) —
+// 특정 날짜가 없으니 캘린더에 점을 찍을 수가 없어서 groupDeadlinesByDay가 그냥 건너뜀
+export type DeadlineLike = { startDate: string | null; categoryId: string };
 
 export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -15,6 +17,7 @@ export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 export function groupDeadlinesByDay(deadlines: DeadlineLike[], year: number, month: number) {
   const map: Record<number, Set<string>> = {};
   for (const d of deadlines) {
+    if (!d.startDate) continue; // 상시모집은 특정 날짜가 없어서 점을 못 찍음
     const dt = new Date(d.startDate);
     if (dt.getFullYear() === year && dt.getMonth() === month) {
       const day = dt.getDate();

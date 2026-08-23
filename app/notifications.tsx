@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { HeaderBackButton } from '@/components/header-back-button';
 import { COLORS } from '@/constants/moa-colors';
-import { DEADLINES } from '@/data/deadlines';
+import { usePolicies } from '@/lib/usePolicies';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { useSession } from '@/lib/useSession';
 
@@ -24,12 +24,14 @@ function formatMonthDay(dateStr: string): string {
 
 export default function NotificationsScreen() {
   const { session } = useSession();
-  const { savedIds, refresh: refreshSaved } = useSavedPolicies(session?.user.id);
+  const { policies, refresh: refreshPolicies } = usePolicies();
+  const { savedIds, refresh: refreshSaved } = useSavedPolicies(session?.user.id, policies);
 
   useFocusEffect(
     useCallback(() => {
+      refreshPolicies();
       refreshSaved();
-    }, [refreshSaved])
+    }, [refreshPolicies, refreshSaved])
   );
 
   const today = new Date();
@@ -37,10 +39,12 @@ export default function NotificationsScreen() {
   const todayLabel = formatMonthDay(today.toISOString());
 
   // 찜한 것 중, 오늘 기준으로 마감이 정확히 1일/3일/5일 남은 것만 골라서 알림처럼 보여줌
-  // (2일·4일 전 같은 애매한 시점은 실제 알림이 안 가는 시점이라 여기서도 안 보여줌)
-  const notifications = DEADLINES.filter((d) => savedIds.has(d.id))
+  // (2일·4일 전 같은 애매한 시점은 실제 알림이 안 가는 시점이라 여기서도 안 보여줌).
+  // 상시모집(deadlineDate 없음)은 마감이라는 개념이 없어서 애초에 알림 대상이 아님 — 먼저 걸러냄
+  const notifications = policies
+    .filter((d) => savedIds.has(d.id) && d.deadlineDate != null)
     .map((d) => {
-      const deadline = new Date(d.deadlineDate);
+      const deadline = new Date(d.deadlineDate as string);
       deadline.setHours(0, 0, 0, 0);
       const daysLeft = Math.round((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       return { ...d, daysLeft };
