@@ -133,16 +133,14 @@ export default function DeadlineDetailScreen() {
         <View style={styles.titleRow}>
           <Text style={styles.title}>{item.title}</Text>
           {/* 제목 복사 버튼(2026-08-24 추가) — 사람들이 이 제목 그대로 복사해서 밖에서도
-              검색해볼 수 있게. 누르면 "복사하기" 작은 글씨가 잠깐 떴다가 사라짐 */}
+              검색해볼 수 있게. 누르면 "복사됨" 작은 글씨가 잠깐 떴다가 사라짐 */}
           <View style={styles.copyTitleWrap}>
             <Pressable onPress={handleCopyTitle} hitSlop={8} style={styles.copyTitleButton}>
               <MaterialIcons name="content-copy" size={16} color={COLORS.inkSoft} />
             </Pressable>
             {showCopiedLabel && (
-              <View style={styles.copiedLabelBubble}>
-                <Text style={styles.copiedLabelText} numberOfLines={1}>
-                  복사하기
-                </Text>
+              <View style={styles.copiedLabelBubble} pointerEvents="none">
+                <Text style={styles.copiedLabelText}>복사됨</Text>
               </View>
             )}
           </View>
@@ -439,25 +437,23 @@ const styles = StyleSheet.create({
   category: { fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   title: { flex: 1, fontSize: 28, fontWeight: '700', color: COLORS.ink, marginTop: 7, lineHeight: 36 },
-  // 제목 복사 버튼 + "복사하기" 말풍선(2026-08-24 추가, 아이콘 아래에 가로로 뜨도록 수정) —
-  // 말풍선은 버튼 바로 밑에 절대 위치로 띄워서, 떴다 사라져도 옆 텍스트(제목)가 밀리지 않게 함.
-  // copyTitleWrap에 alignItems: 'flex-start'를 안 주면 절대배치 자식(말풍선)이 부모 폭(아이콘
-  // 크기만큼 좁음)에 맞춰 늘어나면서 글자가 세로로 줄바꿈되는 문제가 있었음.
-  copyTitleWrap: { marginTop: 11, alignItems: 'flex-start' },
+  // 제목 복사 버튼 + "복사됨" 말풍선(2026-08-24 추가, 아이콘 아래에 가로로 뜨도록 여러 번 수정) —
+  // 이전엔 말풍선 폭/위치를 부모 기준 백분율(top:'100%')과 내용 기준 자동 크기에 맡겼는데, 그
+  // 계산이 기기마다 달라서 "복사하기" 중 "복"자 하나만 남고 잘려 보이는 문제가 계속 있었음.
+  // 그래서 폭/높이/위치를 전부 고정 픽셀값으로 못박아서(Yoga의 자동 측정에 전혀 의존 안 하게)
+  // 확실하게 고침 — 아이콘(24×24 크기) 아래 중앙에 76×24 말풍선이 뜸.
+  copyTitleWrap: { marginTop: 11, width: 24 },
   copyTitleButton: { padding: 4 },
-  // 말풍선 폭을 내용 크기에 맡겼더니(2026-08-24) 일부 기기에서 "복사하기" 중 "복"자 하나만
-  // 남기고 잘려 보이는 문제가 있었음(절대배치 + 좁은 부모 조합에서 텍스트 기준 자동 크기 계산이
-  // 기기마다 다르게 됨) — 4글자가 넉넉히 들어갈 고정 폭을 줘서 확실히 해결함.
   copiedLabelBubble: {
     position: 'absolute',
-    top: '100%',
-    left: 0,
-    marginTop: 4,
+    top: 26,
+    left: -26,
     width: 76,
+    height: 24,
+    justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.ink,
     borderRadius: 6,
-    paddingVertical: 4,
   },
   copiedLabelText: { fontSize: 11.5, fontWeight: '600', color: COLORS.paper },
 
