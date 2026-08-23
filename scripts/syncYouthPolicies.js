@@ -164,9 +164,12 @@ const PROVINCE_ABBR_TO_FULL = {
   제주: '제주특별자치도',
 };
 
-// "OO시/군/구"처럼 도(道) 이름 바로 다음에 오는 관할 시/군/구 단위 — 2~3글자 + 시/군/구.
+// "OO시/군/구"처럼 도(道) 이름 바로 다음에 오는 관할 시/군/구 단위 — 1~3글자 + 시/군/구.
 // (예: "평택시", "예천군", "해운대구". "정책과"/"경제국"처럼 부서명은 시/군/구로 끝나지 않아 안 걸림)
-const CITY_UNIT_RE = /^[가-힣]{2,3}(시|군|구)$/;
+// 처음엔 2~3글자로 뒀었는데, 광역시 자치구 중엔 "동구"/"중구"/"남구"/"북구"/"서구"처럼 1글자+구인
+// 경우가 흔해서(부산/대구/인천/광주/대전/울산 전부 "동구"가 있음) "울산 동구 청년의 날"처럼 시/도
+// 바로 다음이 이런 1글자 구인 경우를 놓치고 있었음(2026-08-23 사용자가 발견) — 1글자까지 허용함.
+const CITY_UNIT_RE = /^[가-힣]{1,3}(시|군|구)$/;
 
 // zipCd(법정동 코드) 앞 2자리 → 정식 시/도 명칭. org_name에 지역이 안 드러나는 정책(부서명만
 // 있는 경우, 예: "일자리경제과")을 위한 2차 보강 수단(2026-08-23 추가) — 사용자가 "아산시
@@ -213,41 +216,60 @@ function resolveRegionFromZipCd(zipCd) {
   return undefined;
 }
 
+// 텍스트를 토큰으로 쪼개서 "시/도 이름(약칭/정식 둘 다) → 바로 다음 토큰이 시/군/구 단위면 그걸
+// 우선 사용" 패턴을 찾음. org_name과 title 둘 다 이 패턴을 쓸 수 있어서 공통 함수로 뺌
+// (2026-08-23, title 스캔 추가하면서 분리).
+function findProvinceInTokens(tokens, startIndex) {
+  for (let i = startIndex; i < tokens.length; i++) {
+    const token = tokens[i];
+    for (const [abbr, full] of Object.entries(PROVINCE_ABBR_TO_FULL)) {
+      // 경상북도/경상남도/충청북도/충청남도/전라북도/전라남도는 정식 명칭에 "라"/"청"/"상"이
+      // 끼어 있어서 약칭(경북 등)이 정식 명칭의 부분 문자열이 아님(예: "경상북도"에 "경북"이
+      // 안 들어있음) — 약칭/정식 명칭 둘 다 검사함.
+      if (!token.includes(abbr) && !token.includes(full)) continue;
+      // 도 이름 바로 다음 토큰이 "평택시"처럼 더 구체적인 시/군/구 단위면 그걸 우선 씀.
+      // 도 단위(예: "경기도")만 저장하면 그 도의 다른 시에 사는 사람도 매칭돼버림 — 실제로
+      // "경기도 평택시 기획항만경제실"이 주관하는, 평택 "관내" 거주자만 대상인 정책이
+      // 도 전체(경기도) 거주자에게 신청 가능하다고 잘못 표시되는 걸 사용자가 발견함(2026-08-23).
+      const next = tokens[i + 1];
+      if (next && CITY_UNIT_RE.test(next) && next !== full) {
+        return { keyword: next, province: full };
+      }
+      return { keyword: full, province: full };
+    }
+  }
+  return {};
+}
+
 // regionKeyword(자격 판정용, 시/군/구까지 구체화될 수 있음)와 regionProvince(검색 화면 지역
-// 필터 칩용, 항상 17개 시/도 중 하나)를 한 번에 계산함.
+// 필터 칩용, 항상 17개 시/도 중 하나)를 한 번에 계산함. 3단계로 시도함:
+// 1) 주관기관명(가장 신뢰도 높음 — 실제 주관 주체) 2) zipCd(법정동 코드) 3) 제목 맨 앞 단어
+// (2026-08-23 추가 — 아래 참고).
 function resolveRegion(item) {
   const orgName = (item.sprvsnInstCdNm || item.operInstCdNm || '').trim();
   if (orgName) {
-    const tokens = orgName.split(/\s+/);
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      for (const [abbr, full] of Object.entries(PROVINCE_ABBR_TO_FULL)) {
-        // 경상북도/경상남도/충청북도/충청남도/전라북도/전라남도는 정식 명칭에 "라"/"청"/"상"이
-        // 끼어 있어서 약칭(경북 등)이 정식 명칭의 부분 문자열이 아님(예: "경상북도"에 "경북"이
-        // 안 들어있음). org_name이 정식 명칭 그대로인 정책은 약칭만 검사하면 놓쳐서
-        // regionKeyword가 하나도 안 잡힘 — 약칭/정식 명칭 둘 다 검사해서 고침.
-        if (!token.includes(abbr) && !token.includes(full)) continue;
-        // 도 이름 바로 다음 토큰이 "평택시"처럼 더 구체적인 시/군/구 단위면 그걸 우선 씀.
-        // 도 단위(예: "경기도")만 저장하면 그 도의 다른 시에 사는 사람도 매칭돼버림 — 실제로
-        // "경기도 평택시 기획항만경제실"이 주관하는, 평택 "관내" 거주자만 대상인 정책이
-        // 도 전체(경기도) 거주자에게 신청 가능하다고 잘못 표시되는 걸 사용자가 발견함(2026-08-23).
-        const next = tokens[i + 1];
-        if (next && CITY_UNIT_RE.test(next) && next !== full) {
-          return { keyword: next, province: full };
-        }
-        return { keyword: full, province: full };
-      }
-    }
+    const result = findProvinceInTokens(orgName.split(/\s+/), 0);
+    if (result.keyword) return result;
   }
 
-  // org_name으로 못 찾았으면 zipCd로 한 번 더 시도함(2026-08-23 추가) — "아산시 쉼표청년
-  // 지원사업"/"홍성 청년의 날" 등 org_name이 "일자리경제과"/"경제정책과"처럼 부서명뿐이라
-  // 지역이 아예 안 잡히던 정책들이 이걸로 잡힘. 시/군/구 단위까지는 못 잡고(정확한 법정동
-  // 코드표가 없어서) 시/도 단위까지만 잡지만, 지역 제한을 아예 놓치는 것보단 훨씬 나음.
+  // org_name으로 못 찾았으면 zipCd로 한 번 더 시도함 — "아산시 쉼표청년 지원사업"/"홍성 청년의
+  // 날" 등 org_name이 "일자리경제과"/"경제정책과"처럼 부서명뿐이라 지역이 아예 안 잡히던
+  // 정책들이 이걸로 잡힘. 시/군/구 단위까지는 못 잡고(정확한 법정동 코드표가 없어서) 시/도
+  // 단위까지만 잡지만, 지역 제한을 아예 놓치는 것보단 훨씬 나음.
   const zipProvince = resolveRegionFromZipCd(item.zipCd);
   if (zipProvince) {
     return { keyword: zipProvince, province: zipProvince };
   }
+
+  // zipCd도 못 잡았으면(코드가 아예 없거나, "울산 동구 청년의 날 기념행사 운영"처럼 원본 데이터의
+  // zipCd 자체가 전국 코드 목록으로 잘못 채워져 있는 경우 — 실제로 발견함, 2026-08-23) 제목 맨
+  // 앞이 시/도 이름으로 시작하는지 마지막으로 확인함. 제목 중간에 지역명이 언급되는 경우까지
+  // 다 스캔하면(예: "...서울에서 개최") 엉뚱한 지역으로 오판할 위험이 있어서, 관례상 지역
+  // 정책 제목은 지역명으로 "시작"한다는 점만 믿고 첫 단어만 봄 — 그마저도 시/군/구 단위 이름
+  // (예: "아산", "홍성")까지는 흔한 단어와 겹칠 위험이 있어 다루지 않고, 상대적으로 안전한
+  // 17개 시/도 이름(서울/부산/울산 등)이 첫 단어일 때만 인정함.
+  const titleResult = findProvinceInTokens((item.plcyNm || '').trim().split(/\s+/).slice(0, 2), 0);
+  if (titleResult.keyword) return titleResult;
 
   return {};
 }
@@ -255,6 +277,54 @@ function resolveRegion(item) {
 // 연령 조건만 비교적 신뢰도 높게 매핑함. 소득 조건(earnCndSeCd/earnMinAmt/earnMaxAmt)은 코드값이라
 // 온통청년 공통코드 조회 없이는 "제한없음"인지 실제 금액 조건인지 구분이 안 돼서, 잘못된 조건으로
 // 사람들을 거르느니 아예 안 넣는 쪽을 택함(추후 공통코드 조회 API 붙이면 채울 것 — 지금은 스킵).
+// schoolCd(학력요건)/jobCd(취업요건)/sbizCd(특화요건) — 온통청년 공식 코드정의서
+// (youthcenter.go.kr 오픈API 소개 페이지의 "API코드정보.xlsx", 2026-08-23 다운받아 실측 확인)
+// 기준값. 이 세 코드가 있다는 것 자체는 진작부터 raw에 담겨 있었는데, Requirements엔 연령/소득/
+// 무주택/지역 4개만 있어서 프로필에 대학생 여부/취업준비생 여부 필드가 있어도 실제 판정엔
+// 전혀 안 쓰이고 있었음 — 사용자가 "대학생 대상 공고인데 나(비대학생)한테 지원 가능이라고 뜬다"고
+// 지적해서 발견함.
+const SCHOOL_UNIV_ENROLLED = '0049005'; // 대학 재학
+const JOB_UNEMPLOYED = '0013003'; // 미취업자
+const SBIZ_BASIC_LIVELIHOOD = '0014003'; // 기초생활수급자
+const SBIZ_SINGLE_PARENT = '0014004'; // 한부모가정
+
+function parseCodeList(raw) {
+  return (raw || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// schoolCd/jobCd는 콤마로 여러 값이 같이 올 수 있는데("대학 재학,석·박사"처럼 OR 조건인 경우 등),
+// 우리 프로필엔 그 조합을 정확히 표현할 필드가 없어서, "이 코드 하나만 단독으로 걸린 경우"일 때만
+// 확실한 신호로 보고 반영함 — 여러 값이 섞여 있으면 어설프게 판단하느니 조건 없음(지원 가능)으로
+// 안전하게 둠.
+function resolveStatusRequirements(item) {
+  const requirements = {};
+
+  const schoolCodes = parseCodeList(item.schoolCd);
+  if (schoolCodes.length === 1 && schoolCodes[0] === SCHOOL_UNIV_ENROLLED) {
+    requirements.requiresUniversityStudent = true;
+  }
+
+  const jobCodes = parseCodeList(item.jobCd);
+  if (jobCodes.length === 1 && jobCodes[0] === JOB_UNEMPLOYED) {
+    requirements.requiresJobSeeker = true;
+  }
+
+  // sbizCd(특화요건)는 "이 대상군도 포함"에 가까운 태그라 다른 값과 같이 와도(예: 여성+한부모가정)
+  // 그 자체로 유효한 신호라서 단독 여부와 무관하게 포함 여부만 봄.
+  const sbizCodes = parseCodeList(item.sbizCd);
+  if (sbizCodes.includes(SBIZ_BASIC_LIVELIHOOD)) {
+    requirements.requiresBasicLivelihoodRecipient = true;
+  }
+  if (sbizCodes.includes(SBIZ_SINGLE_PARENT)) {
+    requirements.requiresSingleParentFamily = true;
+  }
+
+  return requirements;
+}
+
 function resolveRequirements(item) {
   const requirements = {};
   const maxAge = parseInt(item.sprtTrgtMaxAge, 10);
@@ -268,6 +338,7 @@ function resolveRequirements(item) {
   if (regionProvince) {
     requirements.regionProvince = regionProvince;
   }
+  Object.assign(requirements, resolveStatusRequirements(item));
   return requirements;
 }
 
