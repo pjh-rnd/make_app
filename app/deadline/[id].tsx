@@ -147,8 +147,10 @@ export default function DeadlineDetailScreen() {
             이렇게 따로 알려줌(사용자 피드백: "카드는 원래대로, 안내는 공고 안에서"). 온통청년
             원본이 회차별 접수 기간 대신 사업 전체 운영 기간을 신청기간란에 넣어두는 경우가 실제로
             많이 발견됨(평택 청년-기업 이어드림/올해의 K-스타트업 등, lib/deadlineUtils.ts
-            LONG_TERM_SPAN_DAYS 주석 참고) */}
-        {isLongPeriod && (
+            LONG_TERM_SPAN_DAYS 주석 참고). phase가 이미 'rolling'이면 바로 위 신청기간 줄에서
+            "상시 접수 · 신청 기간이 정해져 있지 않아요"라고 알려주니 이 박스는 중복이라 뺌(마감일이
+            올해를 넘어가는 정책은 2026-08-24부터 아예 rolling으로 분류돼서 여기 안 걸림). */}
+        {isLongPeriod && phase !== 'rolling' && (
           <View style={styles.longTermNotice}>
             <Text style={styles.longTermNoticeText}>
               📅 이 공고는 연중 여러 차례 접수하는 사업이에요. 위 신청기간은 사업 전체 운영 기간이라,
