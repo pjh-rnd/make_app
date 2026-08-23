@@ -167,9 +167,12 @@ const PROVINCE_ABBR_TO_FULL = {
 // (예: "평택시", "예천군", "해운대구". "정책과"/"경제국"처럼 부서명은 시/군/구로 끝나지 않아 안 걸림)
 const CITY_UNIT_RE = /^[가-힣]{2,3}(시|군|구)$/;
 
-function resolveRegionKeyword(item) {
+// regionKeyword(자격 판정용, 시/군/구까지 구체화될 수 있음)와 regionProvince(검색 화면 지역
+// 필터 칩용, 항상 17개 시/도 중 하나)를 한 번에 계산함 — 도 이름을 찾은 시점의 `full` 값을
+// province로 그대로 쓰면 되니 로직은 하나로 합쳐도 됨(2026-08-23, 지역 필터 칩 추가하면서 분리).
+function resolveRegion(item) {
   const orgName = (item.sprvsnInstCdNm || item.operInstCdNm || '').trim();
-  if (!orgName) return undefined;
+  if (!orgName) return {};
   const tokens = orgName.split(/\s+/);
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
@@ -185,12 +188,12 @@ function resolveRegionKeyword(item) {
       // 도 전체(경기도) 거주자에게 신청 가능하다고 잘못 표시되는 걸 사용자가 발견함(2026-08-23).
       const next = tokens[i + 1];
       if (next && CITY_UNIT_RE.test(next) && next !== full) {
-        return next;
+        return { keyword: next, province: full };
       }
-      return full;
+      return { keyword: full, province: full };
     }
   }
-  return undefined;
+  return {};
 }
 
 // 연령 조건만 비교적 신뢰도 높게 매핑함. 소득 조건(earnCndSeCd/earnMinAmt/earnMaxAmt)은 코드값이라
@@ -202,9 +205,12 @@ function resolveRequirements(item) {
   if (item.sprtTrgtAgeLmtYn === 'Y' && Number.isFinite(maxAge) && maxAge > 0) {
     requirements.maxAge = maxAge;
   }
-  const regionKeyword = resolveRegionKeyword(item);
+  const { keyword: regionKeyword, province: regionProvince } = resolveRegion(item);
   if (regionKeyword) {
     requirements.regionKeyword = regionKeyword;
+  }
+  if (regionProvince) {
+    requirements.regionProvince = regionProvince;
   }
   return requirements;
 }

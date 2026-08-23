@@ -6,6 +6,12 @@ export type Requirements = {
   maxHouseholdMonthlyIncome?: number; // 만원 단위, 가구 월 소득 상한
   requiresNoHouse?: boolean; // 개인 무주택 요건
   regionKeyword?: string; // 거주지(도/시/구) 중 하나에 이 단어가 포함돼야 함 (예: '서울', '관악')
+  // regionKeyword보다 넓은 시/도 단위 값 (2026-08-23 검색 화면 지역 필터용으로 추가) — regionKeyword가
+  // "평택시"처럼 시/군/구 단위로 더 구체화된 경우에도 regionProvince엔 그 상위 도("경기도")가 항상
+  // 같이 들어있음. calculateMatch()의 자격 판정(지원 가능/조건 미충족 배지)엔 안 쓰고, 정확도가
+  // 필요없는 "지역별로 대충 걸러보기" 용도인 app/search.tsx의 지역 필터 칩에서만 씀 — 시/군/구까지
+  // 몇백 개를 칩으로 늘어놓을 수 없어서, 17개 시/도로만 굵게 거르고 세부 자격은 배지로 따로 보여줌.
+  regionProvince?: string;
 };
 
 export type MatchCriterion = { label: string; met: boolean };

@@ -1,5 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { DeadlineCard } from '@/components/deadline-card';
@@ -11,6 +11,7 @@ import {
   CATEGORY_ORDER,
   COLORS,
 } from '@/constants/moa-colors';
+import { PROVINCES } from '@/constants/regions';
 import { computeDday } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
 import { usePolicies } from '@/lib/usePolicies';
@@ -85,6 +86,38 @@ export default function SearchScreen() {
     setSearchCategoryIds(new Set());
   }
 
+  // 지역 필터(2026-08-23 추가) — 카테고리 칩과 똑같은 "전체 vs 여러 개 선택" 패턴. 다만 기본값이
+  // 다름: 카테고리는 항상 "전체"로 시작하지만, 지역은 프로필에 내 지역이 저장돼 있으면 그걸 자동으로
+  // 켜둠(매번 직접 골라야 하면 번거로우니까). profile은 화면 진입 시 비동기로 늦게 채워지는데, 그때마다
+  // 이 초기화가 다시 실행되면 사용자가 이미 직접 바꿔둔 선택이 프로필 재조회(useFocusEffect)때마다
+  // 덮어써지므로, ref로 "최초 1회만" 적용되게 막음.
+  const [regionShowAll, setRegionShowAll] = useState(true);
+  const [selectedRegions, setSelectedRegions] = useState<Set<string>>(new Set());
+  const regionDefaultApplied = useRef(false);
+
+  useEffect(() => {
+    if (!regionDefaultApplied.current && profile?.region_province) {
+      setRegionShowAll(false);
+      setSelectedRegions(new Set([profile.region_province]));
+      regionDefaultApplied.current = true;
+    }
+  }, [profile?.region_province]);
+
+  function toggleRegion(province: string) {
+    setSelectedRegions((prev) => {
+      const next = new Set(prev);
+      if (next.has(province)) next.delete(province);
+      else next.add(province);
+      setRegionShowAll(next.size === 0);
+      return next;
+    });
+  }
+
+  function selectAllRegions() {
+    setRegionShowAll(true);
+    setSelectedRegions(new Set());
+  }
+
   const trimmedQuery = searchQuery.trim();
 
   // 검색어가 비어있으면 텍스트 필터링 없이 전체 공고를 다 보여줌(빈칸 상태로 열려도 뭐라도 보이게)
@@ -103,7 +136,15 @@ export default function SearchScreen() {
 
   const visibleSearchResults = searchResults
     .filter((d) => !excludeClosed || computeDday(d.startDate, d.deadlineDate).phase !== 'closed')
-    .filter((d) => !savedOnly || savedIds.has(d.id));
+    .filter((d) => !savedOnly || savedIds.has(d.id))
+    // 지역 조건이 아예 없는(=전국 대상 또는 지역 정보 자체를 못 찾은) 공고는 필터를 걸어도 항상
+    // 보여줌 — "이 지역 확실히 아님"이 아니라 "모름"에 가까우니, 잘못 숨기는 것보단 나음
+    .filter(
+      (d) =>
+        regionShowAll ||
+        !d.requirements.regionProvince ||
+        selectedRegions.has(d.requirements.regionProvince)
+    );
 
   // "지원 가능순"/"인기순"이 켜져있으면 그 순서대로 먼저 적용됨 — 사용자가 직접 켠 정렬
   // 기준이라, 마감된 공고라도 인기 많으면 그 기준으로 위로 올라올 수 있음(마감된 게 아예 보기
@@ -196,6 +237,37 @@ export default function SearchScreen() {
                 <Text style={[styles.categoryChipText, active && styles.chipTextActive]}>
                   {CATEGORY_ICON[catId]} {CATEGORY_LABEL[catId]}
                 </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* 지역 필터(2026-08-23 추가) — 17개 시/도 중 여러 개를 동시에 켤 수 있음(카테고리 칩과 같은
+          패턴). "경기도"를 켜면 "평택시"처럼 그 도 안의 시/군/구 단위로 더 구체화된 공고도 같이
+          보임(requirements.regionProvince가 항상 상위 도까지 저장해두기 때문) — 실제 신청 자격은
+          카드에 뜨는 "지원 가능"/"조건 미충족" 배지가 regionKeyword로 더 정확하게 따로 판정하니,
+          이 필터는 "대충 내 지역 위주로 보기" 용도로만 씀. 색은 아래 정렬/필터 줄(진한 회색)보다
+          한 단계 연하게 둬서 "이 줄부터 필터가 시작된다"는 느낌 없이 카테고리 줄과 자연스럽게
+          이어지게 함 */}
+      <View style={styles.regionChipWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.regionChipRow}>
+          <Pressable
+            onPress={selectAllRegions}
+            style={[styles.regionChip, regionShowAll && styles.chipActive]}>
+            <Text style={[styles.chipText, regionShowAll && styles.chipTextActive]}>전체</Text>
+          </Pressable>
+          {PROVINCES.map((p) => {
+            const active = !regionShowAll && selectedRegions.has(p.id);
+            return (
+              <Pressable
+                key={p.id}
+                onPress={() => toggleRegion(p.id)}
+                style={[styles.regionChip, active && styles.chipActive]}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{p.label}</Text>
               </Pressable>
             );
           })}
@@ -321,6 +393,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 0,
   },
+  // 지역 필터 줄(2026-08-23 추가) — sortRowWrap('#E3E1D9')보다 한 단계 연한 회색으로 둬서,
+  // 카테고리 줄(흰 배경) → 지역 줄(연회색) → 정렬/필터 줄(진회색) 순서로 점점 진해지게 함.
+  regionChipWrap: { height: 42, overflow: 'hidden', backgroundColor: '#EEECE4' },
+  regionChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    minWidth: '100%',
+  },
+  regionChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 13,
+    borderRadius: 100,
+    backgroundColor: COLORS.paperRaise,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+  },
+
   // 굵은 구분선(rowDivider) 대신 이 배경색 하나만으로 위 카테고리 칩 줄과 구분되게 함.
   // 위/아래 padding을 똑같이 줘서 칩들이 회색 영역 안에서 정확히 세로 가운데에 오게 함.
   // 배경색은 바깥 Wrap View에 줘야 칩보다 내용이 짧을 때도 줄 전체가 회색으로 채워짐
