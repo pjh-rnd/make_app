@@ -1,6 +1,6 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { DeadlineCard } from '@/components/deadline-card';
 import { HeaderBackButton } from '@/components/header-back-button';
@@ -240,30 +240,34 @@ export default function SearchScreen() {
         마감 2주 이내 · 시작 1달 이내인 공고만 모아봤어요
       </Text>
 
-      {/* keyboardShouldPersistTaps="handled" — 이게 없으면 키보드가 떠있는 상태에서 카드를 눌렀을 때
+      {/* 검색어가 비어있으면 기본으로 전체 공고(500건 넘음)가 다 보이는데, 예전엔 이걸 그냥
+          ScrollView 안에서 .map()으로 한꺼번에 다 그렸었음 — 화면에 안 보이는 카드까지 전부
+          한 번에 렌더링하느라 검색 화면 진입 자체가 눈에 띄게 느려지는 원인이었음(2026-08-23).
+          FlatList는 화면에 실제로 보이는 카드 몇 개만 먼저 그리고, 스크롤하면서 나머지를
+          그때그때 그려주는(가상화) 리스트라 카드 개수가 아무리 많아도 처음 그리는 비용이
+          거의 고정됨.
+          keyboardShouldPersistTaps="handled" — 이게 없으면 키보드가 떠있는 상태에서 카드를 눌렀을 때
           첫 탭은 키보드만 내려가고(터치가 카드까지 안 전달됨) 한 번 더 눌러야 이동되는 문제가 있음 */}
-      <ScrollView
+      <FlatList
+        data={sortedSearchResults}
+        keyExtractor={(d) => d.id}
+        renderItem={({ item: d }) => (
+          <DeadlineCard
+            item={d}
+            hasProfile={hasProfile}
+            isSaved={savedIds.has(d.id)}
+            onToggleSave={async () => {
+              await toggleSaved({ id: d.id, title: d.title, deadlineDate: d.deadlineDate });
+              refreshSaveCounts();
+            }}
+            saveCount={saveCounts.get(d.id) ?? 0}
+          />
+        )}
+        ListEmptyComponent={<Text style={styles.emptyText}>검색 결과가 없어요</Text>}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag">
-        {sortedSearchResults.length === 0 ? (
-          <Text style={styles.emptyText}>검색 결과가 없어요</Text>
-        ) : (
-          sortedSearchResults.map((d) => (
-            <DeadlineCard
-              key={d.id}
-              item={d}
-              hasProfile={hasProfile}
-              isSaved={savedIds.has(d.id)}
-              onToggleSave={async () => {
-                await toggleSaved({ id: d.id, title: d.title, deadlineDate: d.deadlineDate });
-                refreshSaveCounts();
-              }}
-              saveCount={saveCounts.get(d.id) ?? 0}
-            />
-          ))
-        )}
-      </ScrollView>
+        keyboardDismissMode="on-drag"
+      />
     </View>
   );
 }
