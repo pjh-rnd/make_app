@@ -23,7 +23,28 @@ async function main() {
   }
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const rows = summaries.map((s) => ({
+  // policies는 동기화 기간 창(scripts/syncYouthPolicies.js)이 바뀔 때마다 오래된 행이
+  // 정리(delete)될 수 있는데, 그 정책의 AI 요약이 이미 여기 이 파일에 있으면 policy_id 외래키가
+  // 깨져서 upsert 전체가 실패했었음(2026-08-24 발견 — 한 번에 61건을 upsert하다가 이미 삭제된
+  // 정책 6건 때문에 나머지 55건까지 통째로 실패함). 그래서 먼저 실제로 존재하는 policy_id만
+  // 걸러내고, 존재하지 않는 건 upsert 대상에서 빼고 경고만 띄움(파일 자체는 그대로 둬도 안전).
+  const { data: existingPolicies, error: fetchError } = await supabase.from('policies').select('id');
+  if (fetchError) {
+    throw new Error(`policies 조회 실패: ${fetchError.message}`);
+  }
+  const existingIds = new Set(existingPolicies.map((p) => p.id));
+
+  const validSummaries = summaries.filter((s) => existingIds.has(s.policyId));
+  const orphaned = summaries.filter((s) => !existingIds.has(s.policyId));
+  if (orphaned.length > 0) {
+    console.log(
+      `  주의: ${orphaned.length}건은 policies 테이블에서 이미 사라진 정책이라 건너뜀 — ${orphaned
+        .map((s) => s.policyId)
+        .join(', ')}`
+    );
+  }
+
+  const rows = validSummaries.map((s) => ({
     policy_id: s.policyId,
     summary_intro: s.summaryIntro,
     summary_support: s.summarySupport,
