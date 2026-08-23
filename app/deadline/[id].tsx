@@ -133,7 +133,9 @@ export default function DeadlineDetailScreen() {
           value={
             phase === 'rolling'
               ? '상시 접수 · 신청 기간이 정해져 있지 않아요'
-              : `${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`
+              : phase === 'longterm'
+                ? '연중 여러 차례 접수 · 정확한 일정은 아래 공식 링크에서 확인하세요'
+                : `${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`
           }
         />
         {extra?.orgName ? <InfoRow label="정책기관" value={extra.orgName} /> : null}

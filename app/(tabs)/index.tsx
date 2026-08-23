@@ -187,11 +187,13 @@ export default function HomeScreen() {
   // "진행 중"(지금 신청 가능)·"예정"(아직 신청 시작 전)·"마감"(끝난 것, 기본은 접힌 상태).
   // 상시모집(phase: 'rolling')은 "언제든 신청 가능"이라는 점에서 진행 중과 같은 성격이라
   // 진행 중 섹션에 같이 넣음(2026-08-23, 실제 데이터 연동하면서 추가된 phase).
+  // longterm(장기/다회차)도 같은 이유로 같이 넣음(2026-08-23, 마감일 자체를 못 믿는 것뿐이지
+  // 신청 자체는 지금도 가능한 상태라서 — lib/deadlineUtils.ts LONG_TERM_SPAN_DAYS 주석 참고).
   // 사용자가 고른 인기순/지원 가능순 토글(homeSortPopular/homeSortEligible)을 그대로 적용함
   const activeDeadlines = sortHomeList<DeadlineWithMatch>(
     deadlinesWithMatch.filter((d) => {
       const phase = computeDday(d.startDate, d.deadlineDate).phase;
-      return phase === 'active' || phase === 'rolling';
+      return phase === 'active' || phase === 'rolling' || phase === 'longterm';
     }),
     homeSortPopular,
     homeSortEligible,

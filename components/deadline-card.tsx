@@ -80,7 +80,9 @@ export function DeadlineCard({
           <Text style={[styles.period, { fontSize: 12.5 * fontScale }]}>
             {phase === 'rolling'
               ? '상시 접수 중 · 언제든 신청 가능해요'
-              : `신청 ${formatMonthDay(item.startDate!)} 시작 · ${formatMonthDay(item.deadlineDate!)} 마감`}
+              : phase === 'longterm'
+                ? '연중 여러 차례 접수 · 정확한 일정은 공식 링크에서 확인하세요'
+                : `신청 ${formatMonthDay(item.startDate!)} 시작 · ${formatMonthDay(item.deadlineDate!)} 마감`}
           </Text>
           {/* 지역 조건을 항상 명시적으로 보여줌(2026-08-23 추가) — regionKeyword가 없는 공고를
               보고 "이거 지역 상관없이 다 되는 건가?"라고 헷갈려하는 사용자 피드백이 있었음.
