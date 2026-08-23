@@ -192,8 +192,8 @@
 
 ## 아직 안 끝난 것 / 외부 작업 필요 (내가 코드로 못 하는 것들)
 
-- [ ] **`supabase/policy_save_counts.sql`을 Supabase SQL Editor에서 수동 실행** — 안 하면 인기순
-  관련 기능이 다 0으로 보임.
+- [x] ~~`supabase/policy_save_counts.sql`을 Supabase SQL Editor에서 수동 실행~~ — 2026-08-23,
+  사용자가 직접 SQL Editor에서 실행 완료. 인기순 정렬/찜 개수 표시 실제로 동작함.
 - [ ] 카카오/네이버 개발자 콘솔에 앱 등록 + Supabase 대시보드 OAuth provider 설정 — 안 하면
   소셜 로그인 버튼 눌러도 실제 로그인 안 됨.
 - [ ] 회원탈퇴 시 실제 Supabase Auth 계정 삭제 — Edge Function(admin API) 필요, 지금은 프로필/찜
