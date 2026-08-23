@@ -233,6 +233,10 @@ export default function SearchScreen() {
         </ScrollView>
       </View>
 
+      {/* 지금 보이는 공고가 총 몇 건인지 — 카테고리·정렬/필터 칩을 누를 때마다 sortedSearchResults가
+          다시 계산되니 이 숫자도 자동으로 같이 바뀜(따로 갱신 로직 필요 없음) */}
+      <Text style={styles.resultCount}>총 {sortedSearchResults.length}건</Text>
+
       {/* scripts/syncYouthPolicies.js가 온통청년 API에서 데이터를 가져올 때 이미 이 기간
           기준으로 걸러서 Supabase에 저장하기 때문에(너무 많아서), 검색해도 이 범위 밖의 공고는
           애초에 목록에 없음 — 사용자가 "왜 이것밖에 안 나오지?" 헷갈리지 않게 안내해둠 */}
@@ -342,13 +346,22 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13.7, color: COLORS.inkSoft },
   chipTextActive: { color: '#FFFFFF', fontWeight: '600' },
 
+  // syncWindowHint(흐릿한 안내문)보다는 눈에 띄게 — 실제 정보(지금 몇 건 보이는지)라서
+  resultCount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.ink,
+    textAlign: 'center',
+    paddingTop: 10,
+  },
+
   // 홈 화면 calendarHint와 같은 톤(작고 흐릿한 안내 문구)으로 맞춤
   syncWindowHint: {
     fontSize: 11,
     color: COLORS.inkSoft,
     textAlign: 'center',
     opacity: 0.7,
-    paddingTop: 8,
+    paddingTop: 2,
     paddingBottom: 2,
   },
 
