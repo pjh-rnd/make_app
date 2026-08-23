@@ -455,9 +455,8 @@ GitHub Actions 같은 걸로 매일 자동 실행되게 만드는 게 다음 작
     `app/deadline/[id].tsx`는 이 요약이 있으면(`aiSummary`) 새 구조로, 없으면(대부분의 정책)
     기존 원문 그대로 보여주는 방식으로 자동 대체됨(fallback) — 517건 중 아직 1건만 채워짐,
     나머지는 이번에 안 건드림.
-  - **⚠️ 아직 안 한 일**: `supabase/policy_ai_summaries.sql`을 대시보드 SQL Editor에서 실행하고
-    `npm run sync-ai-summaries`를 돌려야 이 1건이 실제로 앱에 반영됨(코드까지만 완료, 데이터
-    반영은 사용자 SQL 실행 대기 중).
+  - **✅ SQL 실행 + 데이터 반영 완료(2026-08-23)**: 사용자가 `supabase/policy_ai_summaries.sql`
+    실행 확인, `npm run sync-ai-summaries`로 이 1건 업로드 완료 — 앱에서 이 정책만 새 구조로 보임.
 
 ## 지금까지 근본 원인까지 찾아서 고친 버그들
 
