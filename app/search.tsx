@@ -337,6 +337,8 @@ export default function SearchScreen() {
               refreshSaveCounts();
             }}
             saveCount={saveCounts.get(d.id) ?? 0}
+            // 검색 화면 카드 안 "공고문" 글자만 1.2배로(D-day 배지는 그대로 두라는 요청, 2026-08-23)
+            fontScale={1.2}
           />
         )}
         ListEmptyComponent={<Text style={styles.emptyText}>검색 결과가 없어요</Text>}

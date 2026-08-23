@@ -18,6 +18,7 @@ export function DeadlineCard({
   isSaved,
   onToggleSave,
   saveCount = 0,
+  fontScale = 1,
 }: {
   item: DeadlineWithMatch;
   hasProfile: boolean;
@@ -26,6 +27,11 @@ export function DeadlineCard({
   // 이 공고를 찜한 전체 사용자 수 — "인기 있는 공고"를 알아볼 수 있게 하트 밑에 작게 보여줌.
   // 안 넘기면(값이 없는 화면 등) 그냥 숫자를 안 보여줌
   saveCount?: number;
+  // 카드 안 "공고문" 글자(카테고리·매칭 배지·제목·메타·기간·지역)만 키우는 배율(2026-08-23 추가)
+  // — 검색 화면에서만 1.2배로 키워달라는 요청이 있었는데, 이 컴포넌트는 홈 화면과 공용이라 여기
+  // 스타일을 직접 고치면 홈 화면까지 같이 커짐. D-day 배지/하트 아이콘은 대상에서 제외해달라고
+  // 했으므로 얘는 안 건드림. 기본값 1이라 안 넘기면(홈 화면) 기존 크기 그대로.
+  fontScale?: number;
 }) {
   const { label: ddayLabel, phase } = computeDday(item.startDate, item.deadlineDate);
   const dstyle = ddayStyle(phase);
@@ -48,11 +54,14 @@ export function DeadlineCard({
         </View>
         <View style={styles.info}>
           <View style={styles.topRow}>
-            <Text style={[styles.cat, { color: catColor }]}>{item.category}</Text>
+            <Text style={[styles.cat, { color: catColor, fontSize: 12 * fontScale }]}>
+              {item.category}
+            </Text>
             {hasProfile && (
               <Text
                 style={[
                   styles.matchBadge,
+                  { fontSize: 12.5 * fontScale },
                   !item.match.eligible && styles.matchBadgeFail,
                   isAlmost && styles.matchBadgeAlmost,
                 ]}>
@@ -64,11 +73,11 @@ export function DeadlineCard({
               </Text>
             )}
           </View>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.meta}>{item.meta}</Text>
+          <Text style={[styles.title, { fontSize: 16.5 * fontScale }]}>{item.title}</Text>
+          <Text style={[styles.meta, { fontSize: 13.5 * fontScale }]}>{item.meta}</Text>
           {/* 상시모집(phase==='rolling')은 startDate/deadlineDate가 둘 다 null이라 날짜를 못 보여주고,
               대신 "언제든 신청 가능"이라는 걸 알려줌 */}
-          <Text style={styles.period}>
+          <Text style={[styles.period, { fontSize: 12.5 * fontScale }]}>
             {phase === 'rolling'
               ? '상시 접수 중 · 언제든 신청 가능해요'
               : `신청 ${formatMonthDay(item.startDate!)} 시작 · ${formatMonthDay(item.deadlineDate!)} 마감`}
@@ -77,7 +86,9 @@ export function DeadlineCard({
               보고 "이거 지역 상관없이 다 되는 건가?"라고 헷갈려하는 사용자 피드백이 있었음.
               값이 있든 없든 뭐라도 보여줘야 "안 보이는 건 아직 못 찾은 거"와 "진짜 전국 대상"이
               구분됨 */}
-          <Text style={styles.region}>📍 {item.requirements.regionKeyword ?? '전국'}</Text>
+          <Text style={[styles.region, { fontSize: 12 * fontScale }]}>
+            📍 {item.requirements.regionKeyword ?? '전국'}
+          </Text>
         </View>
       </Pressable>
       {/* 하트 버튼 바로 밑에 "이 공고를 찜한 사람 수"를 작게 붙여둠 — 인스타그램 좋아요 개수처럼
