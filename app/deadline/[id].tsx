@@ -148,12 +148,14 @@ export default function DeadlineDetailScreen() {
             {/* "정책 요약"(2026-08-23 추가) — Claude가 정책 원문을 직접 읽고 쓴 요약. 이 3줄만
                 친근한 말투(~해요)고, 아래 지원대상/지원내용/신청방법/준비서류는 두괄식 개조식
                 (- 로 시작하는 짧은 문장/구)으로 씀 — 사용자 요청으로 톤을 구분함.
-                박스는 밝은 하늘색 그라데이션(expo-linear-gradient, 처음엔 연두~민트였다가 사용자
-                요청으로 변경)으로 친근한 느낌을 줌. 뱃지는 이모지 대신 홈 화면 상단바와 같은
-                FitMeLogo인데, compact보다도 더 작게(scale) 써서 문구("가 요약했어요!")에 비해
-                로고가 너무 크지 않게 함(2026-08-23 사용자 요청) */}
+                박스는 왼쪽 위(밝은 연두)→오른쪽 아래(흰색 지나 하늘색)로 이어지는 대각선
+                그라데이션(expo-linear-gradient) — 가로 방향으로 했더니 부자연스럽다는 피드백을
+                받아 대각선으로 바꿈, 흰색을 중간에 넣어 색이 확실히 구분되면서도 부드럽게 이어지게
+                함(2026-08-23). 뱃지는 이모지 대신 홈 화면 상단바와 같은 FitMeLogo인데, compact보다도
+                더 작게(scale) 써서 문구("가 요약했어요!")에 비해 로고가 너무 크지 않게 함 */}
             <LinearGradient
-              colors={[COLORS.skyPale, COLORS.skySoft]}
+              colors={[COLORS.limeSoft, COLORS.paperRaise, COLORS.skySoft]}
+              locations={[0, 0.5, 1]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.summaryBox}>
@@ -378,73 +380,75 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   ddayBadge: {
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    borderRadius: 9,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     alignSelf: 'flex-start',
   },
-  ddayText: { fontWeight: '700', fontSize: 15 },
-  heartIcon: { fontSize: 22 },
+  ddayText: { fontWeight: '700', fontSize: 18 },
+  heartIcon: { fontSize: 26 },
 
-  category: { fontSize: 13.5, fontWeight: '700', letterSpacing: 0.3 },
-  title: { fontSize: 23, fontWeight: '700', color: COLORS.ink, marginTop: 7, lineHeight: 30 },
+  category: { fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
+  title: { fontSize: 28, fontWeight: '700', color: COLORS.ink, marginTop: 7, lineHeight: 36 },
 
   // "지원혜택" — 눈에 제일 먼저 띄게 색 있는 박스로 강조(2026-08-23 추가)
   highlightBox: {
     backgroundColor: COLORS.mintSoft,
     borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 17,
     marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
-  highlightLabel: { fontSize: 13, fontWeight: '700', color: COLORS.mint },
-  highlightValue: { fontSize: 17, fontWeight: '700', color: COLORS.ink },
+  highlightLabel: { fontSize: 16, fontWeight: '700', color: COLORS.mint },
+  highlightValue: { fontSize: 20, fontWeight: '700', color: COLORS.ink },
 
   // "정책 요약" 박스(2026-08-23 추가, 그라데이션으로 다시 손봄) — 연두→민트 밝은 그라데이션으로
   // "FitMe가 직접 요약해준" 느낌을 친근하게 줌(사용자 요청)
   summaryBox: {
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 6,
+    paddingVertical: 17,
+    paddingHorizontal: 19,
+    gap: 7,
   },
   summaryBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 4 },
-  // 요약 본문(summaryLine, 14.5)보다 확실히 크게 — 사용자 요청
-  summaryBadgeText: { fontSize: 19, fontWeight: '700', color: COLORS.ink },
-  summaryLine: { fontSize: 14.5, color: COLORS.ink, lineHeight: 21 },
+  // 요약 본문(summaryLine)보다 확실히 크게 — 사용자 요청
+  summaryBadgeText: { fontSize: 23, fontWeight: '700', color: COLORS.ink },
+  summaryLine: { fontSize: 17, color: COLORS.ink, lineHeight: 25 },
 
-  infoRow: { flexDirection: 'row', marginTop: 9 },
-  infoLabel: { width: 68, fontSize: 14, color: COLORS.inkSoft, opacity: 0.75 },
-  infoValue: { flex: 1, fontSize: 14, color: COLORS.ink },
+  infoRow: { flexDirection: 'row', marginTop: 11 },
+  infoLabel: { width: 80, fontSize: 17, color: COLORS.inkSoft, opacity: 0.75 },
+  infoValue: { flex: 1, fontSize: 17, color: COLORS.ink },
 
-  divider: { height: 1, backgroundColor: COLORS.line, marginVertical: 20 },
+  divider: { height: 1, backgroundColor: COLORS.line, marginVertical: 22 },
 
+  // 본문(detail/bulletLine 등)보다 확실히 크게 — 사용자 요청("지원대상/지원내용/신청방법/
+  // 준비서류/관할기관 정보 같은 소제목이 본문보다 커야 함", 2026-08-23)
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 21,
     fontWeight: '700',
     color: COLORS.inkSoft,
     letterSpacing: 0.3,
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  subLabel: { fontSize: 13, fontWeight: '700', color: COLORS.ink, marginBottom: 4 },
-  subLabelSpaced: { marginTop: 14 },
-  detail: { fontSize: 16, color: COLORS.ink, lineHeight: 24 },
-  bulletLine: { fontSize: 15, color: COLORS.ink, lineHeight: 22, marginTop: 4 },
-  criterion: { fontSize: 15.5, marginTop: 7, lineHeight: 21 },
+  subLabel: { fontSize: 20, fontWeight: '700', color: COLORS.ink, marginBottom: 5 },
+  subLabelSpaced: { marginTop: 17 },
+  detail: { fontSize: 19, color: COLORS.ink, lineHeight: 29 },
+  bulletLine: { fontSize: 18, color: COLORS.ink, lineHeight: 26, marginTop: 5 },
+  criterion: { fontSize: 19, marginTop: 8, lineHeight: 25 },
   criterionMet: { color: COLORS.mint },
   criterionUnmet: { color: COLORS.coral },
-  perk: { fontSize: 15.5, color: COLORS.ink, marginTop: 7, lineHeight: 21 },
-  link: { fontSize: 15.5, color: COLORS.mint, fontWeight: '600', marginTop: 9, lineHeight: 21 },
+  perk: { fontSize: 19, color: COLORS.ink, marginTop: 8, lineHeight: 25 },
+  link: { fontSize: 19, color: COLORS.mint, fontWeight: '600', marginTop: 11, lineHeight: 25 },
 
-  emptyComment: { fontSize: 14, color: COLORS.inkSoft, opacity: 0.75 },
-  commentRow: { marginTop: 14 },
+  emptyComment: { fontSize: 17, color: COLORS.inkSoft, opacity: 0.75 },
+  commentRow: { marginTop: 17 },
   commentHeadRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  commentMeta: { fontSize: 12, color: COLORS.inkSoft, opacity: 0.75 },
-  commentDelete: { fontSize: 12, color: COLORS.coral },
-  commentContent: { fontSize: 15, color: COLORS.ink, marginTop: 4, lineHeight: 21 },
+  commentMeta: { fontSize: 14, color: COLORS.inkSoft, opacity: 0.75 },
+  commentDelete: { fontSize: 14, color: COLORS.coral },
+  commentContent: { fontSize: 18, color: COLORS.ink, marginTop: 5, lineHeight: 25 },
 
   commentInputBar: {
     flexDirection: 'row',
@@ -459,15 +463,15 @@ const styles = StyleSheet.create({
   },
   commentInput: {
     flex: 1,
-    maxHeight: 100,
+    maxHeight: 120,
     borderWidth: 1,
     borderColor: COLORS.line,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    fontSize: 14,
+    fontSize: 17,
     color: COLORS.ink,
   },
-  commentSendIcon: { fontSize: 20, color: COLORS.mint, paddingBottom: 8 },
+  commentSendIcon: { fontSize: 24, color: COLORS.mint, paddingBottom: 8 },
   commentSendIconDisabled: { opacity: 0.35 },
 });
