@@ -47,15 +47,27 @@ function mapRow(row: PolicyRow): Deadline {
 // 다시 받아와서 갱신함 — 첫 진입(앱을 막 켰을 때)만 실제로 기다리고, 그 뒤로는 화면을 옮겨다녀도
 // 바로바로 보임.
 let cachedPolicies: Deadline[] | null = null;
+let lastFetchedAt = 0;
+// 화면마다 useFocusEffect로 refresh()를 부르다 보니(홈↔검색 등 오갈 때마다) 캐시가 있어도 매번
+// 실제 네트워크 요청이 나가고 있었음 — 요청이 겹쳐 돌면서 화면 전환 시점에 JS 스레드가 바빠지는
+// 원인 중 하나였음(2026-08-23). 캐시가 이미 최근에(30초 이내) 갱신됐으면 백그라운드 재요청도
+// 생략하고 그냥 캐시를 씀 — 데이터는 어차피 수동 동기화(npm run sync-policies)로만 바뀌니
+// 30초 이내 재조회를 건너뛰어도 실질적으로 사용자가 느낄 손해가 없음
+const BACKGROUND_REFRESH_MIN_INTERVAL_MS = 30_000;
 
 export function usePolicies() {
   const [policies, setPolicies] = useState<Deadline[]>(cachedPolicies ?? []);
   const [loading, setLoading] = useState(cachedPolicies === null);
 
   const refresh = useCallback(async () => {
-    // 캐시가 있으면 로딩 상태 없이 기존 데이터를 그대로 유지한 채 백그라운드에서만 갱신함
     if (cachedPolicies === null) {
       setLoading(true);
+    } else if (Date.now() - lastFetchedAt < BACKGROUND_REFRESH_MIN_INTERVAL_MS) {
+      // 캐시가 최근 것이면 네트워크 요청 자체를 생략 — 혹시 이 훅 인스턴스가 아직 캐시를
+      // 반영 못 했으면(거의 없는 경우) 여기서 한 번 맞춰줌
+      setPolicies(cachedPolicies);
+      setLoading(false);
+      return;
     }
     // PostgREST 기본 응답 상한이 1000행이라, 지금(500여 건)보다 데이터가 꽤 늘어나도 한 번에
     // 다 받아오게 넉넉히 range를 지정해둠(2000행까지)
@@ -73,6 +85,7 @@ export function usePolicies() {
 
     const mapped = (data ?? []).map(mapRow);
     cachedPolicies = mapped;
+    lastFetchedAt = Date.now();
     setPolicies(mapped);
     setLoading(false);
   }, []);

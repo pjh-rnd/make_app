@@ -27,6 +27,12 @@ export function useSavedPolicies(userId: string | undefined, policies: Deadline[
   const [saved, setSaved] = useState<Map<string, SavedRow>>(new Map());
   const [loading, setLoading] = useState(true);
 
+  // saved_policies 테이블 조회는 userId가 바뀔 때만 다시 함 — 예전엔 policies에도 의존해서, 홈
+  // 화면이 포커스될 때마다 usePolicies()가 백그라운드로 정책 목록을 다시 받아오면(매번 새
+  // 배열 레퍼런스가 됨) 이 refresh까지 연쇄적으로 다시 실행되면서 saved_policies를 계속 불필요하게
+  // 재조회했음 — 이게 겹쳐 돌면서 검색 화면으로 넘어가는 순간 JS 스레드가 바빠서 화면 전환 자체가
+  // 늦게 시작되는 문제가 있었음(2026-08-23). 알림 재예약 백필은 아래 별도 effect로 분리해서
+  // saved_policies를 다시 안 불러오고도 처리되게 함.
   const refresh = useCallback(async () => {
     if (!userId) {
       setSaved(new Map());
@@ -51,33 +57,48 @@ export function useSavedPolicies(userId: string | undefined, policies: Deadline[
     }
     setSaved(next);
     setLoading(false);
-
-    // 예전에 찜했지만 알림 기능이 생기기 전이라 notification_id가 비어있는 것들을 채워넣음
-    // (혹은 재설치 등으로 예약이 날아갔을 때도 다시 잡아줌)
-    for (const row of next.values()) {
-      if (row.notificationIds.length > 0) continue;
-      const policy = policies.find((d) => d.id === row.policyId);
-      // 상시모집(deadlineDate 없음)은 마감 기준 알림을 계산할 수가 없어서 예약 자체를 건너뜀
-      if (!policy || !policy.deadlineDate) continue;
-      const notificationIds = await scheduleDeadlineReminders(policy.title, policy.deadlineDate);
-      if (notificationIds.length > 0) {
-        await supabase
-          .from('saved_policies')
-          .update({ notification_id: packIds(notificationIds) })
-          .eq('user_id', userId)
-          .eq('policy_id', row.policyId);
-        setSaved((prev) => {
-          const updated = new Map(prev);
-          updated.set(row.policyId, { policyId: row.policyId, notificationIds });
-          return updated;
-        });
-      }
-    }
-  }, [userId, policies]);
+  }, [userId]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // 예전에 찜했지만 알림 기능이 생기기 전이라 notification_id가 비어있는 것들을 채워넣음
+  // (혹은 재설치 등으로 예약이 날아갔을 때도 다시 잡아줌). saved_policies는 다시 안 불러오고,
+  // 이미 메모리에 있는 saved 상태 + 최신 policies 목록만으로 처리함 — policies가 바뀔 때마다
+  // (홈 화면 백그라운드 갱신 등) 이 effect는 다시 돌지만, notificationIds가 이미 채워진 항목은
+  // 그냥 건너뛰기만 해서 실제 네트워크 요청 없이 빠르게 끝남
+  useEffect(() => {
+    if (!userId || policies.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const row of saved.values()) {
+        if (cancelled) return;
+        if (row.notificationIds.length > 0) continue;
+        const policy = policies.find((d) => d.id === row.policyId);
+        // 상시모집(deadlineDate 없음)은 마감 기준 알림을 계산할 수가 없어서 예약 자체를 건너뜀
+        if (!policy || !policy.deadlineDate) continue;
+        const notificationIds = await scheduleDeadlineReminders(policy.title, policy.deadlineDate);
+        if (notificationIds.length > 0) {
+          await supabase
+            .from('saved_policies')
+            .update({ notification_id: packIds(notificationIds) })
+            .eq('user_id', userId)
+            .eq('policy_id', row.policyId);
+          if (!cancelled) {
+            setSaved((prev) => {
+              const updated = new Map(prev);
+              updated.set(row.policyId, { policyId: row.policyId, notificationIds });
+              return updated;
+            });
+          }
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, policies, saved]);
 
   // 찜/찜해제를 반대로 뒤집는 함수. 먼저 화면부터 바꾸고(낙관적 업데이트),
   // 서버 요청이 실패하면 원래대로 되돌림. 찜하면 마감 5일/3일/1일 전 알림이 같이 예약됨
