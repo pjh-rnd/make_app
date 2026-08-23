@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -145,13 +146,19 @@ export default function DeadlineDetailScreen() {
           <>
             {/* "정책 요약"(2026-08-23 추가) — Claude가 정책 원문을 직접 읽고 쓴 요약. 이 3줄만
                 친근한 말투(~해요)고, 아래 지원대상/지원내용/신청방법/준비서류는 두괄식 개조식
-                (- 로 시작하는 짧은 문장/구)으로 씀 — 사용자 요청으로 톤을 구분함 */}
-            <Text style={styles.sectionLabel}>정책 요약</Text>
-            <View style={styles.summaryBox}>
+                (- 로 시작하는 짧은 문장/구)으로 씀 — 사용자 요청으로 톤을 구분함.
+                박스는 연두~민트 그라데이션(expo-linear-gradient)으로 친근한 느낌을 줌 —
+                사용자가 "FitMe가 요약했어요!" 문구 + 브랜드 이모지를 요청함(2026-08-23) */}
+            <LinearGradient
+              colors={[COLORS.limeSoft, COLORS.mintSoft]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.summaryBox}>
+              <Text style={styles.summaryBadge}>🎯 FitMe가 요약했어요!</Text>
               <Text style={styles.summaryLine}>정책 안내: {aiSummary.summaryIntro}</Text>
               <Text style={styles.summaryLine}>지원내용: {aiSummary.summarySupport}</Text>
               <Text style={styles.summaryLine}>신청방법: {aiSummary.summaryApply}</Text>
-            </View>
+            </LinearGradient>
 
             <View style={styles.divider} />
             <Text style={styles.sectionLabel}>지원대상</Text>
@@ -390,15 +397,15 @@ const styles = StyleSheet.create({
   highlightLabel: { fontSize: 13, fontWeight: '700', color: COLORS.mint },
   highlightValue: { fontSize: 17, fontWeight: '700', color: COLORS.ink },
 
-  // "정책 요약" 박스(2026-08-23 추가) — 지원혜택 박스와 톤을 맞춰 연한 배경을 쓰되, 3줄이라
-  // 세로로 쌓음
+  // "정책 요약" 박스(2026-08-23 추가, 그라데이션으로 다시 손봄) — 연두→민트 밝은 그라데이션으로
+  // "FitMe가 직접 요약해준" 느낌을 친근하게 줌(사용자 요청)
   summaryBox: {
-    backgroundColor: COLORS.mintSoft,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     gap: 6,
   },
+  summaryBadge: { fontSize: 13.5, fontWeight: '700', color: COLORS.mint, marginBottom: 2 },
   summaryLine: { fontSize: 14.5, color: COLORS.ink, lineHeight: 21 },
 
   infoRow: { flexDirection: 'row', marginTop: 9 },
