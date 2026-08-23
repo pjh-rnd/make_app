@@ -68,7 +68,7 @@ export function DeadlineCard({
                 {item.match.eligible
                   ? '지원 가능'
                   : isAlmost
-                    ? '조건 1개만 더 맞으면'
+                    ? '조건 1개 불만족'
                     : '조건 미충족'}
               </Text>
             )}
