@@ -77,8 +77,12 @@ export function calculateMatch(profile: Profile | null, requirements: Requiremen
     });
   }
 
+  // 판정할 필수 조건을 하나도 못 찾았으면(연령/소득/무주택/지역 전부 데이터에 없는 경우) 자격이
+  // 없는 게 아니라 반대로 "막는 조건이 없다"는 뜻이라 지원 가능이 맞음 — 예전엔 여기서 무조건
+  // 자격 없음(eligible: false)으로 처리해서, 실제로는 아무 제한도 없는 정책들이 죄다 "조건
+  // 미충족"으로 잘못 뜨고 있었음(2026-08-23 사용자가 발견).
   if (criteria.length === 0) {
-    return { eligible: false, percent: 0, criteria };
+    return { eligible: true, percent: 100, criteria };
   }
 
   // 이 조건들은 정부 지원사업의 "필수 자격요건"이라, 부분 충족이라는 게 없음.

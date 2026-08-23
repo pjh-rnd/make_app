@@ -69,6 +69,9 @@ export default function DeadlineDetailScreen() {
             ? '상시 접수 · 신청 기간이 정해져 있지 않아요'
             : `신청기간 ${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`}
         </Text>
+        {/* 지역 조건을 항상 명시적으로 보여줌(2026-08-23 추가) — regionKeyword가 없으면 "전국"이라고
+            직접 알려줘서, 지역 정보를 아직 못 찾은 건지 진짜 전국 대상인지 헷갈리지 않게 함 */}
+        <Text style={styles.period}>📍 {item.requirements.regionKeyword ?? '전국'}</Text>
 
         <View style={styles.divider} />
 

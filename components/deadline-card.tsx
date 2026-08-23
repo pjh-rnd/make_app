@@ -73,6 +73,11 @@ export function DeadlineCard({
               ? '상시 접수 중 · 언제든 신청 가능해요'
               : `신청 ${formatMonthDay(item.startDate!)} 시작 · ${formatMonthDay(item.deadlineDate!)} 마감`}
           </Text>
+          {/* 지역 조건을 항상 명시적으로 보여줌(2026-08-23 추가) — regionKeyword가 없는 공고를
+              보고 "이거 지역 상관없이 다 되는 건가?"라고 헷갈려하는 사용자 피드백이 있었음.
+              값이 있든 없든 뭐라도 보여줘야 "안 보이는 건 아직 못 찾은 거"와 "진짜 전국 대상"이
+              구분됨 */}
+          <Text style={styles.region}>📍 {item.requirements.regionKeyword ?? '전국'}</Text>
         </View>
       </Pressable>
       {/* 하트 버튼 바로 밑에 "이 공고를 찜한 사람 수"를 작게 붙여둠 — 인스타그램 좋아요 개수처럼
@@ -111,6 +116,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 16.5, fontWeight: '600', color: COLORS.ink, marginTop: 3 },
   meta: { fontSize: 13.5, color: COLORS.inkSoft, marginTop: 4 },
   period: { fontSize: 12.5, color: COLORS.inkSoft, marginTop: 4, opacity: 0.75 },
+  region: { fontSize: 12, color: COLORS.inkSoft, marginTop: 2, opacity: 0.65 },
 
   heartColumn: { position: 'absolute', top: 8, right: 8, alignItems: 'center' },
   heartButton: { padding: 4 },
