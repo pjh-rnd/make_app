@@ -1,4 +1,4 @@
-# Fit Me — 진행 상황 정리 (~2026-08-23 기준)
+# Fit Me — 진행 상황 정리 (~2026-08-23 기준, 온통청년 연동 파이프라인 포함)
 
 > 이 문서는 컴퓨터가 갑자기 꺼지거나(자동 업데이트 등) 세션/대화 맥락이 날아가도, 지금까지
 > 무엇을 왜 이렇게 만들었는지 다시 파악할 수 있게 남겨두는 기록임. Claude(나)가 나중에 다시
@@ -170,8 +170,46 @@
   14일 지난 건 자동으로 화면에서 숨김(로드할 때마다 오늘 날짜 기준 재계산).
 - 일부 대표 항목(카테고리별 5개 정도)에 `perks`(이런 점이 좋아요!)/`links`(관련 링크) 필드 채움,
   나머진 비어있음.
-- **여전히 Phase 3 목표로 남아있는 것**: 실제 공공 API(온통청년 등) 연동 — 지금은 다 하드코딩
-  mock 데이터. [[youth-policy-api-sources]] 메모리에 관련 API 리서치 있음.
+- **앱은 아직 이 mock을 그대로 씀 — 아래 11번 항목이 "진짜 데이터는 준비됐지만 앱이 아직 안 갈아탄"
+  상태를 설명함.**
+
+### 11. 실제 온통청년 데이터 파이프라인 (Phase 3, 2026-08-23 — 절반 완료)
+
+**끝난 것: 실제 데이터를 Supabase에 채워넣는 파이프라인.**
+- [supabase/policies.sql](../supabase/policies.sql) — 새 `public.policies` 테이블. `saved_policies`/
+  `profiles`와 달리 "공개 정책 목록"이라 RLS는 "로그인하면 누구나 읽기"만 있고, 쓰기는
+  `service_role`(RLS 우회)로만 함.
+- [scripts/syncYouthPolicies.js](../scripts/syncYouthPolicies.js) — `npm run sync-policies`로 실행하는
+  서버 전용 동기화 스크립트(Node `--env-file=.env`로 실행, dotenv 패키지 불필요). 온통청년
+  `/go/ythip/getPlcy` 엔드포인트(문서에 있던 옛날 `/opi/youthPlcyList.do`가 아님, [[youthcenter-api-key-renewal]]
+  참고)를 페이지네이션 돌면서 전체를 가져오고(재시도/백오프 포함 — 서버가 가끔 HTML 에러페이지나
+  totCount 0을 잠깐 주는 걸 실측함), 우리 스키마로 매핑, 저장 대상만 걸러서 upsert함.
+  - **카테고리 매핑**: 온통청년 대분류(lclsfNm)로 1차 매핑(일자리→job/교육→edu/주거→housing/나머지
+    전부→welfare catch-all). 자산(money)만 예외 — 온통청년엔 "자산형성" 중분류가 아예 없고 제일
+    가까운 "취약계층 및 금융지원"도 실측해보니 85%가 복지성(학자금대출이자, 상담, 보험)이라, 그건
+    기본 welfare로 보내고 제목/설명에 저축·적금·자산형성·도약계좌 등 진짜 키워드가 있는 것만
+    공식분류 무시하고 money로 강제 지정함.
+  - **날짜 파싱**: `aplyYmd`("YYYYMMDD ~ YYYYMMDD") 우선, 없으면 `bizPrdBgngYmd/EndYmd`. 원본에
+    `00010101`/`29991231` 같은 더미값이 실제로 섞여있는 걸 발견해서 연도 2015~2035 범위 검증 추가.
+    둘 다 없거나(연중/상시모집) 검증 실패하면 `is_rolling=true`로 표시(날짜는 null).
+  - **동기화 기간 필터(사용자 요청, "너무 많아서")**: 전체를 다 저장하지 않고, **시작일이 오늘+2달
+    이내 이거나(이미 시작한 것 포함) / 마감일이 오늘-1달 이내인 것만** 저장. 상시모집은 무조건 포함.
+    재동기화할 때마다 이 기준으로 다시 걸러지고, 기간 밖으로 벗어난 기존 row는 delete로 정리됨(4단계).
+    **아직 자동/주기 실행(cron) 없음 — 수동으로 `npm run sync-policies` 재실행해야 최신 상태 유지됨.**
+  - **소득 조건은 스킵**: `earnCndSeCd`류가 코드값이라 공통코드 조회 없인 "제한없음"인지 실제
+    금액조건인지 구분 불가 — 잘못된 조건으로 거르느니 아예 안 넣음(연령 조건만 채움).
+  - 2026-08-23 최초 실행 결과: 2,728건 수신 → 필터 후 **1,268건 저장**(상시모집 740건 포함),
+    카테고리 분포 edu 164 / housing 139 / welfare 502 / job 450 / money 13.
+
+**아직 안 끝난 것: 앱 화면을 이 `policies` 테이블에 연결하는 것.** 지금 앱은 여전히
+`data/deadlines.ts`의 하드코딩 mock을 그대로 읽음. 연결하려면 최소 이런 변경이 필요함:
+- `startDate`/`deadlineDate`를 다루는 ~10개 파일(`app/(tabs)/index.tsx`, `app/search.tsx`,
+  `app/deadline/[id].tsx`, `app/notifications.tsx`, `lib/calendarUtils.ts`, `lib/deadlineUtils.ts`,
+  `components/deadline-card.tsx` 등)이 전부 "두 날짜가 항상 존재한다"고 가정하고 있어서, 상시모집
+  (`is_rolling`, 날짜 null)을 위한 새 phase/배지("상시모집")를 추가하고 nullable 날짜를 다뤄야 함.
+  캘린더 점 찍기·정렬(`sortHomeList` 등)도 null 날짜 케이스를 처리해야 함.
+- 하드코딩 배열 대신 Supabase `policies`를 읽는 새 훅(예: `lib/usePolicies.ts`)이 필요함.
+- 이건 이번 세션에서 손 안 댐 — 다음에 이어서 할 큰 작업으로 남겨둠.
 
 ## 지금까지 근본 원인까지 찾아서 고친 버그들
 
@@ -200,7 +238,10 @@
   데이터만 지우고 로그아웃함.
 - [ ] "내가 지원한 공고"/커뮤니티(내가 쓴 글/댓글) — 전부 UI만 있고 "준비 중" placeholder.
 - [x] ~~2탭 vs 3탭 구조 최종 결정~~ — 2026-08-23, **2탭(홈+전체)으로 확정**하고 `main`에 전부 머지 완료.
-- [ ] 실제 공공 API(온통청년 등) 연동해서 mock 데이터 교체 — [[youth-policy-api-sources]] 참고.
+- [~] 실제 공공 API(온통청년 등) 연동해서 mock 데이터 교체 — **절반 완료(2026-08-23)**. 실제 데이터를
+  Supabase `policies` 테이블에 넣는 파이프라인(`supabase/policies.sql` + `npm run sync-policies`)은
+  끝났고 1,268건 실제로 들어가있음. **남은 절반: 앱 화면이 아직 이걸 안 읽고 여전히
+  `data/deadlines.ts` mock을 씀** — 상세는 위 10번 항목과 [[youthcenter-api-key-renewal]] 참고.
 
 ## 관련 메모리 파일
 
