@@ -17,6 +17,10 @@ export const COLORS = {
   skySoft: '#DCE9F7',
   violet: '#8B5FBF',
   violetSoft: '#EDE4F5',
+  // 6번째 카테고리 "참여" 추가하면서 새로 필요해진 색(2026-08-23). 기존 5색(초록/주황/빨강/파랑/보라)과
+  // 안 겹치는 로즈(분홍) 계열로 고름
+  rose: '#C2508A',
+  roseSoft: '#F6E1EC',
   // D-day 배지용 — 시작 전(연회색)/진행 중(연두색)/마감 후(그냥 회색) 3단계
   paleGray: '#9C9C9C',
   paleGraySoft: '#EAEAEA',
@@ -28,12 +32,18 @@ export const COLORS = {
 
 // 카테고리 id → 점/뱃지 색. 달력 점 색깔이 이 순서·색과 항상 일치해야 사람들이 외워서 구분할 수 있음
 // (색이 바뀌면 CATEGORY_LABEL, CATEGORY_ORDER, 그리고 홈/찜한정책 화면의 범례도 같이 바꿔야 함)
+//
+// participation("참여")은 2026-08-23에 추가됨 — 온통청년 데이터를 실제로 연동해보니 대분류
+// "참여･기반"(청년참여활동/정책인프라구축/국제교류/권익보호 등, 300건 이상)이 원래 5개 카테고리
+// 어디에도 안 맞아서 전부 "복지"로 밀려들어가 복지 칩이 지나치게 커지는 문제가 있었음 —
+// 그래서 별도 카테고리로 분리함(scripts/syncYouthPolicies.js의 매핑도 같이 고침)
 export const CATEGORY_COLOR: Record<string, string> = {
   housing: COLORS.mint,
   money: COLORS.amber,
   job: COLORS.coral,
   edu: COLORS.sky,
   welfare: COLORS.violet,
+  participation: COLORS.rose,
 };
 
 export const CATEGORY_LABEL: Record<string, string> = {
@@ -42,10 +52,11 @@ export const CATEGORY_LABEL: Record<string, string> = {
   job: '취업',
   edu: '교육',
   welfare: '복지',
+  participation: '참여',
 };
 
 // 범례·그룹 목록을 항상 이 순서로 보여줌 (칩 순서와도 동일하게 맞춤)
-export const CATEGORY_ORDER = ['housing', 'money', 'job', 'edu', 'welfare'];
+export const CATEGORY_ORDER = ['housing', 'money', 'job', 'edu', 'welfare', 'participation'];
 
 // 관심분야 칩에 붙는 이모지 — 홈 화면 칩, 검색창 칩에서 똑같이 씀
 export const CATEGORY_ICON: Record<string, string> = {
@@ -54,6 +65,7 @@ export const CATEGORY_ICON: Record<string, string> = {
   job: '💼',
   edu: '📚',
   welfare: '🏥',
+  participation: '🙋',
 };
 
 // phase(시작 전/진행 중/마감 후)에 따라 D-day 배지 배경/글자색을 다르게 주는 함수

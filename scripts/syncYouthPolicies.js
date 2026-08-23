@@ -35,16 +35,19 @@ const CATEGORY_LABEL = {
   job: '취업',
   edu: '교육',
   welfare: '복지',
+  participation: '참여',
 };
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// 온통청년 대분류(lclsfNm)/중분류(mclsfNm) 텍스트를 우리 5개 카테고리로 매핑함.
-// "참여･기반"처럼 우리 카테고리에 없는 대분류는 전부 welfare로 받아서(catch-all) 정책이
-// 카테고리 매칭 실패로 아예 안 보이는 일이 없게 함(사용자가 "연중/모집형도 다 포함해서 어떻게든
-// 보여준다"고 명시적으로 요청함 — 같은 원칙을 카테고리 매핑에도 적용).
+// 온통청년 대분류(lclsfNm)/중분류(mclsfNm) 텍스트를 우리 6개 카테고리로 매핑함.
+//
+// participation("참여")은 2026-08-23에 추가됨 — 처음엔 "참여･기반"(청년참여활동/정책인프라구축/
+// 국제교류/권익보호 등, 300건 이상)을 대응 카테고리가 없어서 전부 welfare로 몰아넣었는데, 그러니
+// 복지 칩이 지나치게 커지고 분류도 부정확해져서(참여 활동 모집을 "복지"라고 부르는 셈) 사용자
+// 요청으로 별도 카테고리로 분리함(constants/moa-colors.ts도 같이 고침).
 //
 // 2026-08-23 실측 확인: 온통청년 중분류엔 "자산형성" 같은 항목이 아예 없고, 가장 가까운 게
 // "취약계층 및 금융지원"인데 실제로 열어보니(mclsfNm 정확히 일치하는 74건 표본) 거기 담긴 건
@@ -57,6 +60,7 @@ function mapCategory(lclsfNm) {
   if (l.includes('일자리')) return 'job';
   if (l.includes('교육')) return 'edu';
   if (l.includes('주거')) return 'housing';
+  if (l.includes('참여')) return 'participation';
   return 'welfare';
 }
 
@@ -179,15 +183,18 @@ function mapItemToRow(item) {
 // 2,728건을 다 저장하면 너무 많아서(사용자 요청), 동기화 자체를 이 기간 안에 드는 것만 저장하게
 // 걸러냄 — data/deadlines.ts가 예전에 EXPIRY_WINDOW_DAYS로 "마감 14일 지난 건 화면에서 숨김"
 // 하던 것과 비슷한 개념인데, 소스가 Supabase로 옮겨가면서 "저장 자체를 안 함"으로 바뀜:
-//  - 시작일이 오늘로부터 2달 이내(이미 시작한 것도 포함, 즉 start_date <= 오늘+2달)
-//  - 마감일이 1달 이내 지난 것까지(deadline_date >= 오늘-1달)
-//  - 상시모집(is_rolling)은 무조건 포함
+//  - 시작일이 오늘로부터 1달 이내(이미 시작한 것도 포함, 즉 start_date <= 오늘+1달)
+//  - 마감일이 2주 이내 지난 것까지(deadline_date >= 오늘-2주)
+//  - 상시모집(is_rolling)은 **제외**함 — 처음엔 "무조건 포함"이었는데, 실제로 동기화해보니 전체
+//    1,248건 중 740건(59%)이 상시모집이라 날짜 필터를 아무리 좁혀도 "너무 많다"는 문제가 거의
+//    안 줄어드는 게 확인돼서(2026-08-23) 사용자 요청으로 뺌. 스키마의 is_rolling 필드/로직 자체는
+//    남겨둠 — 나중에 다시 포함하고 싶어지면 아래 isWithinSyncWindow 한 줄만 되돌리면 됨.
 // 재동기화(npm run sync-policies)를 다시 돌릴 때마다 이 기준으로 다시 걸러지므로, 시간이
 // 지나면서 창 밖으로 나간 건 자동으로 정리되고(main()의 delete 단계) 새로 창 안에 들어온 건
 // 새로 채워짐 — 그래서 이 스크립트를 주기적으로 재실행하는 게 중요함(아직 자동 스케줄은 없음,
 // 지금은 수동 실행).
-const START_WINDOW_MONTHS_AHEAD = 2;
-const CLOSED_WINDOW_MONTHS_BEHIND = 1;
+const START_WINDOW_MONTHS_AHEAD = 1;
+const CLOSED_WINDOW_DAYS_BEHIND = 14;
 
 function toIsoDate(d) {
   return d.toISOString().slice(0, 10);
@@ -197,12 +204,12 @@ function computeWindowBounds() {
   const maxStart = new Date();
   maxStart.setMonth(maxStart.getMonth() + START_WINDOW_MONTHS_AHEAD);
   const minDeadline = new Date();
-  minDeadline.setMonth(minDeadline.getMonth() - CLOSED_WINDOW_MONTHS_BEHIND);
+  minDeadline.setDate(minDeadline.getDate() - CLOSED_WINDOW_DAYS_BEHIND);
   return { maxStartDate: toIsoDate(maxStart), minDeadlineDate: toIsoDate(minDeadline) };
 }
 
 function isWithinSyncWindow(row, bounds) {
-  if (row.is_rolling) return true;
+  if (row.is_rolling) return false; // 상시모집은 동기화 대상에서 제외(위 주석 참고)
   // is_rolling이 false면 resolveDates()에 의해 start_date/deadline_date 둘 다 값이 있음이 보장됨
   return row.start_date <= bounds.maxStartDate && row.deadline_date >= bounds.minDeadlineDate;
 }
@@ -283,7 +290,7 @@ async function main() {
   const allRows = rawItems.map(mapItemToRow);
 
   const bounds = computeWindowBounds();
-  console.log(`  동기화 기간 필터: 시작일 <= ${bounds.maxStartDate} (오늘+${START_WINDOW_MONTHS_AHEAD}달) / 마감일 >= ${bounds.minDeadlineDate} (오늘-${CLOSED_WINDOW_MONTHS_BEHIND}달) / 상시모집은 무조건 포함`);
+  console.log(`  동기화 기간 필터: 시작일 <= ${bounds.maxStartDate} (오늘+${START_WINDOW_MONTHS_AHEAD}달) / 마감일 >= ${bounds.minDeadlineDate} (오늘-${CLOSED_WINDOW_DAYS_BEHIND}일) / 상시모집은 제외`);
   const rows = allRows.filter((r) => isWithinSyncWindow(r, bounds));
   const excludedRows = allRows.filter((r) => !isWithinSyncWindow(r, bounds));
   console.log(`  기간 필터 결과: ${rows.length}건 유지 / ${excludedRows.length}건 제외 (원본 ${allRows.length}건)`);

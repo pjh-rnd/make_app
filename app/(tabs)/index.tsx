@@ -152,7 +152,7 @@ export default function HomeScreen() {
     setInterestIds(new Set());
   }
 
-  // 켜져있는 칩들의 id 목록 — "전체"가 켜져있으면 다섯 카테고리 전부
+  // 켜져있는 칩들의 id 목록 — "전체"가 켜져있으면 CATEGORY_ORDER 전부
   const activeIds = showAllInterests ? CATEGORY_ORDER : Array.from(interestIds);
 
   // 홈 화면 = "내가 찜한 것만" 보여주는 달력/목록으로 바뀜(예전엔 전체 공고 중 관심분야로만
@@ -323,7 +323,7 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {/* 관심 분야 칩 — 검색 화면 맨 위 줄과 똑같은 구성(전체 + 카테고리 5개). 달력 점 색깔이
+      {/* 관심 분야 칩 — 검색 화면 맨 위 줄과 똑같은 구성(전체 + CATEGORY_ORDER 전부). 달력 점 색깔이
           뭘 뜻하는지 여기서 바로 고를 수 있음. 끄면 그 카테고리 점이 달력에서도 사라지고,
           목록에서도 빠짐 (칩과 달력이 항상 같은 기준으로 맞춰짐). 좁은 화면에서도 항상 한 줄로
           보이게 가로 스크롤로 둠(줄바꿈 대신 스크롤) */}
