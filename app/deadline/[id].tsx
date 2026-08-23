@@ -441,21 +441,22 @@ const styles = StyleSheet.create({
   // 이전엔 말풍선 폭/위치를 부모 기준 백분율(top:'100%')과 내용 기준 자동 크기에 맡겼는데, 그
   // 계산이 기기마다 달라서 "복사하기" 중 "복"자 하나만 남고 잘려 보이는 문제가 계속 있었음.
   // 그래서 폭/높이/위치를 전부 고정 픽셀값으로 못박아서(Yoga의 자동 측정에 전혀 의존 안 하게)
-  // 확실하게 고침 — 아이콘(24×24 크기) 아래 중앙에 76×24 말풍선이 뜸.
+  // 확실하게 고침 — 아이콘(24×24 크기) 아래 중앙에 50×21 말풍선이 뜸(2026-08-24, 처음엔
+  // 76×24였는데 "복사됨" 양옆 여백이 너무 넓다고 해서 줄임).
   copyTitleWrap: { marginTop: 11, width: 24 },
   copyTitleButton: { padding: 4 },
   copiedLabelBubble: {
     position: 'absolute',
     top: 26,
-    left: -26,
-    width: 76,
-    height: 24,
+    left: -13,
+    width: 50,
+    height: 21,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.ink,
     borderRadius: 6,
   },
-  copiedLabelText: { fontSize: 11.5, fontWeight: '600', color: COLORS.paper },
+  copiedLabelText: { fontSize: 11, fontWeight: '600', color: COLORS.paper },
 
   // "지원혜택" — 눈에 제일 먼저 띄게 색 있는 박스로 강조(2026-08-23 추가)
   highlightBox: {
