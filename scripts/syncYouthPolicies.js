@@ -384,11 +384,26 @@ function resolveRequirements(item) {
   return requirements;
 }
 
+// 온통청년 원문 URL 필드에 "https://" 없이 도메인만 적혀있는 경우가 있음(예: "www.btp.or.kr").
+// 앱에서 그대로 Linking.openURL()에 넘기면 절대경로가 아니라 상대경로로 오인해서
+// "Unable to open URL"/이상한 file:// 에러가 남(2026-08-23 사용자가 실제 크래시로 발견).
+// 그리고 아예 URL이 아니라 "전화문의"처럼 안내 문구가 들어있는 경우도 있어서, 도메인처럼 생긴
+// 값만 https://를 붙여 살리고 나머진 버림(잘못된 링크를 보여주는 것보단 아예 안 보여주는 게 나음).
+const BARE_DOMAIN_RE = /^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(\/.*)?$/i;
+
+function normalizeUrl(raw) {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (BARE_DOMAIN_RE.test(trimmed)) return `https://${trimmed}`;
+  return null;
+}
+
 function resolveLinks(item) {
   const links = [];
-  const apply = (item.aplyUrlAddr || '').trim();
-  const ref1 = (item.refUrlAddr1 || '').trim();
-  const ref2 = (item.refUrlAddr2 || '').trim();
+  const apply = normalizeUrl(item.aplyUrlAddr);
+  const ref1 = normalizeUrl(item.refUrlAddr1);
+  const ref2 = normalizeUrl(item.refUrlAddr2);
   if (apply) links.push({ label: '신청 바로가기', url: apply });
   if (ref1 && ref1 !== apply) links.push({ label: '관련 링크', url: ref1 });
   if (ref2 && ref2 !== apply && ref2 !== ref1) links.push({ label: '관련 링크 2', url: ref2 });

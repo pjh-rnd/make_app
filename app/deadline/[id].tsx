@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -73,6 +74,18 @@ export default function DeadlineDetailScreen() {
     const text = commentText;
     setCommentText('');
     await post(text);
+  }
+
+  // 링크를 못 열면(주소가 깨졌거나, 그 사이트가 앱으로 못 여는 형태거나) 그냥 빨간 에러 화면이
+  // 뜨는 대신 알림으로 안내함(2026-08-23 추가) — 사용자가 "www.btp.or.kr"처럼 https:// 없이
+  // 저장돼있던 링크(원본 데이터 문제, scripts/syncYouthPolicies.js에서 별도로 고침)를 눌렀다가
+  // 앱이 처리 안 된 에러를 그대로 띄우는 걸 발견함
+  async function handleOpenLink(url: string) {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('링크를 열 수 없어요', '주소가 잘못됐거나 연결할 수 없는 사이트예요.');
+    }
   }
 
   return (
@@ -254,7 +267,7 @@ export default function DeadlineDetailScreen() {
             <Text style={styles.sectionLabel}>관할기관 정보</Text>
             {extra?.orgName && <Text style={styles.detail}>{extra.orgName}</Text>}
             {item.links.map((link) => (
-              <Pressable key={link.url} onPress={() => Linking.openURL(link.url)}>
+              <Pressable key={link.url} onPress={() => handleOpenLink(link.url)}>
                 <Text style={styles.link}>🔗 {link.label}</Text>
               </Pressable>
             ))}
