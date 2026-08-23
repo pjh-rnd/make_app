@@ -113,9 +113,9 @@ const styles = StyleSheet.create({
   matchBadge: { fontSize: 12.5, fontWeight: '700', color: COLORS.mint },
   // 조건이 몇 개가 안 맞든(1개든 2개 이상이든) 다 똑같이 "조건 미충족"으로 통일함(2026-08-23)
   // — 예전엔 "1개만 부족"인 경우를 amber로, 그 이상은 회색으로 따로 나눴는데, 사용자가 "1개일
-  // 때도 그냥 미충족이라고 통일해줘"로 단순화 요청함. 색은 처음엔 주황(amber)으로 했다가
-  // 바로 "검은색으로 해줘"로 정정받아 COLORS.ink로 바꿈.
-  matchBadgeFail: { color: COLORS.ink },
+  // 때도 그냥 미충족이라고 통일해줘"로 단순화 요청함. 색은 주황(amber) → 검은색(ink) →
+  // 회색(inkSoft) 순으로 두 번 정정받음.
+  matchBadgeFail: { color: COLORS.inkSoft },
   cat: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
   title: { fontSize: 16.5, fontWeight: '600', color: COLORS.ink, marginTop: 3 },
   meta: { fontSize: 13.5, color: COLORS.inkSoft, marginTop: 4 },
