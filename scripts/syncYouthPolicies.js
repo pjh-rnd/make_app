@@ -262,21 +262,21 @@ function resolveRegion(item) {
   }
 
   // zipCd도 못 잡았으면(코드가 아예 없거나, "울산 동구 청년의 날 기념행사 운영"처럼 원본 데이터의
-  // zipCd 자체가 전국 코드 목록으로 잘못 채워져 있는 경우 — 실제로 발견함, 2026-08-23) 제목 맨
-  // 앞이 시/도 이름으로 시작하는지 마지막으로 확인함. 제목 중간에 지역명이 언급되는 경우까지
-  // 다 스캔하면(예: "...서울에서 개최") 엉뚱한 지역으로 오판할 위험이 있어서, 관례상 지역
-  // 정책 제목은 지역명으로 "시작"한다는 점만 믿고 첫 단어만 봄 — 그마저도 시/군/구 단위 이름
-  // (예: "아산", "홍성")까지는 흔한 단어와 겹칠 위험이 있어 다루지 않고, 상대적으로 안전한
-  // 17개 시/도 이름(서울/부산/울산 등)이 첫 단어일 때만 인정함.
-  const titleResult = findProvinceInTokens((item.plcyNm || '').trim().split(/\s+/).slice(0, 2), 0);
+  // zipCd 자체가 전국 코드 목록으로 잘못 채워져 있는 경우 — 실제로 발견함, 2026-08-23) 제목
+  // 전체에서 시/도 이름을 찾음(처음엔 맨 앞 1~2단어만 봤는데, 지역명이 제목 중간에 나오는
+  // 경우도 있어서 사용자 요청으로 전체 스캔으로 넓힘, 2026-08-23). 시/군/구 단위 이름
+  // (예: "아산", "홍성")까지 전체 스캔하면 흔한 단어와 겹칠 위험이 커서(예: "영양"=nutrition,
+  // "장수"=longevity도 실제 군 이름) 그건 여전히 안 하고, 상대적으로 안전한 17개 시/도 이름
+  // (서울/부산/울산 등)만 제목 어디에 있든 인정함 — org명/zipCd 둘 다 실패했을 때만 쓰는
+  // 마지막 수단이라, 아주 드물게 본문과 무관한 지역이 우연히 언급돼 오판할 여지는 있지만(예:
+  // "OO시 청년 서울여행 지원" 같은 제목이면 서울로 잘못 잡힐 수 있음), 지금처럼 지역 조건을
+  // 완전히 놓치는 것보다는 낫다고 판단함.
+  const titleResult = findProvinceInTokens((item.plcyNm || '').trim().split(/\s+/), 0);
   if (titleResult.keyword) return titleResult;
 
   return {};
 }
 
-// 연령 조건만 비교적 신뢰도 높게 매핑함. 소득 조건(earnCndSeCd/earnMinAmt/earnMaxAmt)은 코드값이라
-// 온통청년 공통코드 조회 없이는 "제한없음"인지 실제 금액 조건인지 구분이 안 돼서, 잘못된 조건으로
-// 사람들을 거르느니 아예 안 넣는 쪽을 택함(추후 공통코드 조회 API 붙이면 채울 것 — 지금은 스킵).
 // schoolCd(학력요건)/jobCd(취업요건)/sbizCd(특화요건) — 온통청년 공식 코드정의서
 // (youthcenter.go.kr 오픈API 소개 페이지의 "API코드정보.xlsx", 2026-08-23 다운받아 실측 확인)
 // 기준값. 이 세 코드가 있다는 것 자체는 진작부터 raw에 담겨 있었는데, Requirements엔 연령/소득/
@@ -325,6 +325,47 @@ function resolveStatusRequirements(item) {
   return requirements;
 }
 
+// 소득 조건(2026-08-23 추가, earnCndSeCd/earnMinAmt/earnMaxAmt) — 처음엔 "금액 단위가 정책마다
+// 제각각이라 잘못 해석할 위험이 크다"는 이유로 아예 스킵했었는데, 사용자가 그래도 넣어달라고
+// 요청해서 실제 값들을 원문 설명(addAplyQlfcCndCn/plcySprtCn)과 대조해서 규칙을 만듦.
+// earnCndSeCd === '0043002'(연소득 조건 있음)인 9건을 전수 확인한 결과:
+//   - earnMaxAmt가 그대로 "만원" 단위인 경우(5000→5,000만원, 3692→3,692만원 등)가 대부분이었고
+//   - 딱 1건(청년부부 주거환경 개선사업)만 "43056240"처럼 원(KRW) 단위로 들어있었음(만원으로 읽으면
+//     430억원이 돼서 말이 안 됨 — 10000으로 나누면 4,306만원 정도로 현실적인 값이 됨)
+// → 100만(RAW_WON_THRESHOLD) 이상이면 원 단위로 보고 10000으로 나눠서 만원으로 통일함. 실제
+// 연소득 상한이 "만원 단위로 100만"(=100억원)일 수는 없으니 이 문턱값으로 두 단위를 안전하게 구분함.
+//
+// 개인 소득인지 가구(부부합산) 소득인지는 원본에 별도 필드가 없어서, 설명 텍스트에 "부부합산"
+// 같은 표현이 있는지로 구분함 — 9건 중 "청년 신혼부부 월세지원" 계열 2건만 "연소득(부부합산)"이라고
+// 명시돼 있었고 나머지는 "직전년도 신고소득이 있는 자"/"근로소득 청년"처럼 개인 소득으로 읽혔음.
+// earnMinAmt는 안 씀 — 9건 중 1건(전세보증금반환보증, 청년/청년외/신혼부부별로 5천~7.5천만원 등
+// 구간이 다름)만 0이 아니었는데, 우리 시스템엔 "하한" 개념이 없어서(신청 자격 상 하한이 있는
+// 사업은 극히 드묾) 상한(earnMaxAmt)만 반영함.
+const EARN_COND_ANNUAL_INCOME = '0043002'; // 연소득 조건 있음(0043001=무관, 0043003=기타)
+const HOUSEHOLD_INCOME_HINT_RE = /부부합산|가구\s?소득|세대\s?소득/;
+const RAW_WON_THRESHOLD = 1_000_000;
+
+function normalizeAnnualIncomeManwon(rawAmount) {
+  const n = parseInt(rawAmount, 10);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return n >= RAW_WON_THRESHOLD ? Math.round(n / 10000) : n;
+}
+
+function resolveIncomeRequirement(item) {
+  const requirements = {};
+  if (item.earnCndSeCd !== EARN_COND_ANNUAL_INCOME) return requirements;
+  const capManwon = normalizeAnnualIncomeManwon(item.earnMaxAmt);
+  if (capManwon == null) return requirements;
+
+  const text = `${item.addAplyQlfcCndCn || ''} ${item.plcySprtCn || ''}`;
+  if (HOUSEHOLD_INCOME_HINT_RE.test(text)) {
+    requirements.maxHouseholdAnnualIncome = capManwon;
+  } else {
+    requirements.maxPersonalAnnualIncome = capManwon;
+  }
+  return requirements;
+}
+
 function resolveRequirements(item) {
   const requirements = {};
   const maxAge = parseInt(item.sprtTrgtMaxAge, 10);
@@ -339,6 +380,7 @@ function resolveRequirements(item) {
     requirements.regionProvince = regionProvince;
   }
   Object.assign(requirements, resolveStatusRequirements(item));
+  Object.assign(requirements, resolveIncomeRequirement(item));
   return requirements;
 }
 

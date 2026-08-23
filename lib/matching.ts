@@ -4,6 +4,13 @@ export type Requirements = {
   maxAge?: number;
   maxPersonalMonthlyIncome?: number; // 만원 단위, 개인 월 소득 상한
   maxHouseholdMonthlyIncome?: number; // 만원 단위, 가구 월 소득 상한
+  // 아래 2개는 2026-08-23 추가 — 온통청년 원본 데이터가 소득 조건을 "연소득" 단위로 주는데
+  // (위 2개는 "월" 소득), 굳이 월 단위로 억지로 환산해서 어색한 숫자를 보여주느니 연소득 그대로
+  // 받는 필드를 따로 둠(비교할 땐 profile의 월소득 × 12로 환산해서 비교). scripts/syncYouthPolicies.js
+  // 참고 — 개인 소득인지 가구(부부합산 등) 소득인지는 정책 설명 텍스트에 "부부합산"/"가구소득"
+  // 같은 표현이 있는지로 구분함.
+  maxPersonalAnnualIncome?: number; // 만원 단위, 연소득 기준 개인 소득 상한
+  maxHouseholdAnnualIncome?: number; // 만원 단위, 연소득 기준 가구(부부합산 등) 소득 상한
   requiresNoHouse?: boolean; // 개인 무주택 요건
   regionKeyword?: string; // 거주지(도/시/구) 중 하나에 이 단어가 포함돼야 함 (예: '서울', '관악')
   // regionKeyword보다 넓은 시/도 단위 값 (2026-08-23 검색 화면 지역 필터용으로 추가) — regionKeyword가
@@ -66,6 +73,24 @@ export function calculateMatch(profile: Profile | null, requirements: Requiremen
       met:
         profile?.household_monthly_income != null &&
         profile.household_monthly_income <= requirements.maxHouseholdMonthlyIncome,
+    });
+  }
+
+  if (requirements.maxPersonalAnnualIncome != null) {
+    const annual =
+      profile?.personal_monthly_income != null ? profile.personal_monthly_income * 12 : null;
+    criteria.push({
+      label: `개인 연소득 ${formatManwon(requirements.maxPersonalAnnualIncome)} 이하`,
+      met: annual != null && annual <= requirements.maxPersonalAnnualIncome,
+    });
+  }
+
+  if (requirements.maxHouseholdAnnualIncome != null) {
+    const annual =
+      profile?.household_monthly_income != null ? profile.household_monthly_income * 12 : null;
+    criteria.push({
+      label: `가구 연소득 ${formatManwon(requirements.maxHouseholdAnnualIncome)} 이하`,
+      met: annual != null && annual <= requirements.maxHouseholdAnnualIncome,
     });
   }
 
