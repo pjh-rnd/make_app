@@ -36,13 +36,6 @@ export function DeadlineCard({
   const { label: ddayLabel, phase } = computeDday(item.startDate, item.deadlineDate);
   const dstyle = ddayStyle(phase);
   const catColor = CATEGORY_COLOR[item.categoryId];
-  const unmetCount = item.match.criteria.filter((c) => !c.met).length;
-  const isAlmost = !!(
-    hasProfile &&
-    !item.match.eligible &&
-    item.match.criteria.length > 0 &&
-    unmetCount === 1
-  );
 
   return (
     // 하트 버튼을 카드(Pressable) "안"에 중첩시키지 않고 밖에 별도로 얹음
@@ -63,13 +56,8 @@ export function DeadlineCard({
                   styles.matchBadge,
                   { fontSize: 12.5 * fontScale },
                   !item.match.eligible && styles.matchBadgeFail,
-                  isAlmost && styles.matchBadgeAlmost,
                 ]}>
-                {item.match.eligible
-                  ? '지원 가능'
-                  : isAlmost
-                    ? '조건 1개 불만족'
-                    : '조건 미충족'}
+                {item.match.eligible ? '지원 가능' : '조건 미충족'}
               </Text>
             )}
           </View>
@@ -123,8 +111,11 @@ const styles = StyleSheet.create({
   info: { flex: 1 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   matchBadge: { fontSize: 12.5, fontWeight: '700', color: COLORS.mint },
-  matchBadgeFail: { color: COLORS.inkSoft },
-  matchBadgeAlmost: { color: COLORS.amber },
+  // 조건이 몇 개가 안 맞든(1개든 2개 이상이든) 다 똑같이 "조건 미충족"으로 통일함(2026-08-23)
+  // — 예전엔 "1개만 부족"인 경우를 amber로, 그 이상은 회색으로 따로 나눴는데, 사용자가 "1개일
+  // 때도 그냥 미충족이라고 통일해줘"로 단순화 요청함. 색은 처음엔 주황(amber)으로 했다가
+  // 바로 "검은색으로 해줘"로 정정받아 COLORS.ink로 바꿈.
+  matchBadgeFail: { color: COLORS.ink },
   cat: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
   title: { fontSize: 16.5, fontWeight: '600', color: COLORS.ink, marginTop: 3 },
   meta: { fontSize: 13.5, color: COLORS.inkSoft, marginTop: 4 },
