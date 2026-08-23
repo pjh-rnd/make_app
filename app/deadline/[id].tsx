@@ -1,11 +1,25 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { HeaderBackButton } from '@/components/header-back-button';
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { computeDday, formatMonthDay } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
+import { extractSupportHighlight, formatPolicyGuide, formatRelativeTime } from '@/lib/policyText';
 import { usePolicies } from '@/lib/usePolicies';
+import { usePolicyComments } from '@/lib/usePolicyComments';
+import { usePolicyDetailExtra } from '@/lib/usePolicyDetailExtra';
 import { useProfile } from '@/lib/useProfile';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { useSession } from '@/lib/useSession';
@@ -19,6 +33,11 @@ export default function DeadlineDetailScreen() {
   const { session } = useSession();
   const { profile } = useProfile(session?.user.id);
   const { savedIds, toggle: toggleSaved } = useSavedPolicies(session?.user.id, policies);
+  // 목록용 usePolicies()엔 없는(=일부러 안 담은, 아래 훅 주석 참고) 신청방법/제출서류/지원대상
+  // 상세/지원내용 원문을 이 화면에서만 따로 조회함
+  const { extra } = usePolicyDetailExtra(item?.id);
+  const { comments, post, remove } = usePolicyComments(item?.id, session?.user.id);
+  const [commentText, setCommentText] = useState('');
 
   if (!item) {
     return (
@@ -39,13 +58,27 @@ export default function DeadlineDetailScreen() {
   const catColor = CATEGORY_COLOR[item.categoryId];
   const match = calculateMatch(profile, item.requirements);
 
+  // "지원혜택" 헤드라인 — 지원내용 원문(extra) 먼저, 아직 안 불러왔으면 목록용 detail(요약)에서라도
+  // 찾아봄. lib/policyText.ts 주석 참고: 진짜 AI 계산 요약(예: "월 30만원×8학기"→"최대 240만원")은
+  // 아니고 원문에서 금액 패턴을 찾아 보여주는 수준임.
+  const supportHighlight = extractSupportHighlight(extra?.supportDetailText, item.detail);
+  const guide = formatPolicyGuide(item.detail, extra?.supportDetailText);
+
+  async function handlePostComment() {
+    const text = commentText;
+    setCommentText('');
+    await post(text);
+  }
+
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {/* 네이티브 헤더 대신 화면 안에서 직접 그림 (iOS가 헤더 버튼에 씌우는 원형 배경이 계속
           깜빡이는 문제가 있어서 — app/_layout.tsx에서 이 화면은 headerShown: false로 처리해둠) */}
       <Stack.Screen options={{ headerShown: false }} />
       <ScreenHeader title={item.category} />
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
         <View style={styles.topRow}>
           <View style={[styles.ddayBadge, { backgroundColor: dstyle.bg }]}>
             <Text style={[styles.ddayText, { color: dstyle.text }]}>{ddayLabel}</Text>
@@ -63,20 +96,51 @@ export default function DeadlineDetailScreen() {
 
         <Text style={[styles.category, { color: catColor }]}>{item.category}</Text>
         <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.meta}>{item.meta}</Text>
-        <Text style={styles.period}>
-          {phase === 'rolling'
-            ? '상시 접수 · 신청 기간이 정해져 있지 않아요'
-            : `신청기간 ${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`}
-        </Text>
+
+        {/* 상단 핵심 정보 블록(2026-08-23 개편) — "지원혜택"을 제일 눈에 띄게 맨 위에 두고,
+            신청기간·정책기관(주관기관)·지역을 그 아래 나란히 둠. 이 화면에만 있던 item.meta
+            줄("중분류 · 기관명" 텍스트 뭉치)은 여기서 빠짐 — 기관명이 정책기관 줄이랑 겹쳐서. */}
+        {supportHighlight && (
+          <View style={styles.highlightBox}>
+            <Text style={styles.highlightLabel}>지원혜택</Text>
+            <Text style={styles.highlightValue}>{supportHighlight}</Text>
+          </View>
+        )}
+        <InfoRow
+          label="신청기간"
+          value={
+            phase === 'rolling'
+              ? '상시 접수 · 신청 기간이 정해져 있지 않아요'
+              : `${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`
+          }
+        />
+        {extra?.orgName ? <InfoRow label="정책기관" value={extra.orgName} /> : null}
         {/* 지역 조건을 항상 명시적으로 보여줌(2026-08-23 추가) — regionKeyword가 없으면 "전국"이라고
             직접 알려줘서, 지역 정보를 아직 못 찾은 건지 진짜 전국 대상인지 헷갈리지 않게 함 */}
-        <Text style={styles.period}>📍 {item.requirements.regionKeyword ?? '전국'}</Text>
+        <InfoRow label="지역" value={item.requirements.regionKeyword ?? '전국'} />
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionLabel}>안내</Text>
-        <Text style={styles.detail}>{item.detail}</Text>
+        {/* "안내" → "정책 안내"로 이름을 바꾸고, 두괄식(핵심 먼저) + "-" 불릿으로 다듬어서 보여줌
+            (2026-08-23 개편). lib/policyText.ts의 formatPolicyGuide 참고. */}
+        <Text style={styles.sectionLabel}>정책 안내</Text>
+        {guide.headline && <Text style={styles.detail}>{guide.headline}</Text>}
+        {guide.bullets.map((line, i) => (
+          <Text key={i} style={styles.bulletLine}>
+            {line}
+          </Text>
+        ))}
+
+        {/* 지원대상 상세(2026-08-23 추가) — 온통청년 원문(addAplyQlfcCndCn)을 그대로 보여줌.
+            연령/지역처럼 우리가 구조화해서 판정하는 조건과 별개로, "관내 거주자만" 같은 원문
+            그대로의 세부 조건을 놓치지 않게 원문도 같이 보여줌 */}
+        {extra?.targetDetail && (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>지원대상</Text>
+            <Text style={styles.detail}>{extra.targetDetail}</Text>
+          </>
+        )}
 
         <View style={styles.divider} />
 
@@ -101,10 +165,35 @@ export default function DeadlineDetailScreen() {
           </>
         )}
 
-        {item.links.length > 0 && (
+        {/* 신청방법/제출서류(2026-08-23 추가) — 둘 다 없으면 섹션 자체를 숨김 */}
+        {(extra?.applyMethod || extra?.requiredDocuments) && (
           <>
             <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>관련 링크</Text>
+            <Text style={styles.sectionLabel}>어떻게 신청하나요?</Text>
+            {extra?.applyMethod && (
+              <>
+                <Text style={styles.subLabel}>신청방법</Text>
+                <Text style={styles.detail}>{extra.applyMethod}</Text>
+              </>
+            )}
+            {extra?.requiredDocuments && (
+              <>
+                <Text style={[styles.subLabel, extra?.applyMethod && styles.subLabelSpaced]}>
+                  준비 서류
+                </Text>
+                <Text style={styles.detail}>{extra.requiredDocuments}</Text>
+              </>
+            )}
+          </>
+        )}
+
+        {/* 관할기관 정보(2026-08-23 추가) — 기관명 + 관련 링크(신청 바로가기/홈페이지 등).
+            ⚠️ 온통청년 API엔 기관 전화번호 필드가 따로 없어서(신청 URL만 제공) 전화번호는 못 넣음 */}
+        {(extra?.orgName || item.links.length > 0) && (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>관할기관 정보</Text>
+            {extra?.orgName && <Text style={styles.detail}>{extra.orgName}</Text>}
             {item.links.map((link) => (
               <Pressable key={link.url} onPress={() => Linking.openURL(link.url)}>
                 <Text style={styles.link}>🔗 {link.label}</Text>
@@ -112,7 +201,61 @@ export default function DeadlineDetailScreen() {
             ))}
           </>
         )}
+
+        <View style={styles.divider} />
+
+        <Text style={styles.sectionLabel}>댓글 {comments.length}</Text>
+        {comments.length === 0 ? (
+          <Text style={styles.emptyComment}>아직 댓글이 없어요. 첫 댓글을 남겨보세요!</Text>
+        ) : (
+          comments.map((c) => (
+            <View key={c.id} style={styles.commentRow}>
+              <View style={styles.commentHeadRow}>
+                <Text style={styles.commentMeta}>
+                  🙂 익명 · {formatRelativeTime(c.createdAt)}
+                </Text>
+                {session?.user.id === c.userId && (
+                  <Pressable onPress={() => remove(c.id)} hitSlop={8}>
+                    <Text style={styles.commentDelete}>삭제</Text>
+                  </Pressable>
+                )}
+              </View>
+              <Text style={styles.commentContent}>{c.content}</Text>
+            </View>
+          ))
+        )}
       </ScrollView>
+
+      {/* 댓글 입력칸은 스크롤과 별개로 화면 하단에 항상 고정함(2026-08-23 요청) — ScrollView
+          "밖"의 형제 View라서 본문이 스크롤돼도 이 줄만 안 움직임 */}
+      {session && (
+        <View style={styles.commentInputBar}>
+          <TextInput
+            style={styles.commentInput}
+            value={commentText}
+            onChangeText={setCommentText}
+            placeholder="댓글을 입력해주세요"
+            placeholderTextColor="#B6B0A0"
+            multiline
+          />
+          <Pressable onPress={handlePostComment} hitSlop={10} disabled={!commentText.trim()}>
+            <Text
+              style={[styles.commentSendIcon, !commentText.trim() && styles.commentSendIconDisabled]}>
+              ➤
+            </Text>
+          </Pressable>
+        </View>
+      )}
+    </KeyboardAvoidingView>
+  );
+}
+
+// "라벨: 값" 한 줄 — 상단 핵심 정보 블록(신청기간/정책기관/지역)에서 재사용
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
     </View>
   );
 }
@@ -130,6 +273,7 @@ function ScreenHeader({ title }: { title: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.paper },
+  scroll: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -139,7 +283,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: COLORS.ink },
   headerSpacer: { width: 40 },
-  content: { padding: 20, paddingTop: 4, paddingBottom: 40 },
+  content: { padding: 20, paddingTop: 4, paddingBottom: 32 },
   notFound: { fontSize: 14, color: COLORS.inkSoft, padding: 20 },
 
   topRow: {
@@ -159,8 +303,24 @@ const styles = StyleSheet.create({
 
   category: { fontSize: 13.5, fontWeight: '700', letterSpacing: 0.3 },
   title: { fontSize: 23, fontWeight: '700', color: COLORS.ink, marginTop: 7, lineHeight: 30 },
-  meta: { fontSize: 15, color: COLORS.inkSoft, marginTop: 9 },
-  period: { fontSize: 14, color: COLORS.inkSoft, marginTop: 7, opacity: 0.8 },
+
+  // "지원혜택" — 눈에 제일 먼저 띄게 색 있는 박스로 강조(2026-08-23 추가)
+  highlightBox: {
+    backgroundColor: COLORS.mintSoft,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  highlightLabel: { fontSize: 13, fontWeight: '700', color: COLORS.mint },
+  highlightValue: { fontSize: 17, fontWeight: '700', color: COLORS.ink },
+
+  infoRow: { flexDirection: 'row', marginTop: 9 },
+  infoLabel: { width: 68, fontSize: 14, color: COLORS.inkSoft, opacity: 0.75 },
+  infoValue: { flex: 1, fontSize: 14, color: COLORS.ink },
 
   divider: { height: 1, backgroundColor: COLORS.line, marginVertical: 20 },
 
@@ -171,10 +331,45 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginBottom: 10,
   },
+  subLabel: { fontSize: 13, fontWeight: '700', color: COLORS.ink, marginBottom: 4 },
+  subLabelSpaced: { marginTop: 14 },
   detail: { fontSize: 16, color: COLORS.ink, lineHeight: 24 },
+  bulletLine: { fontSize: 15, color: COLORS.ink, lineHeight: 22, marginTop: 4 },
   criterion: { fontSize: 15.5, marginTop: 7, lineHeight: 21 },
   criterionMet: { color: COLORS.mint },
   criterionUnmet: { color: COLORS.coral },
   perk: { fontSize: 15.5, color: COLORS.ink, marginTop: 7, lineHeight: 21 },
   link: { fontSize: 15.5, color: COLORS.mint, fontWeight: '600', marginTop: 9, lineHeight: 21 },
+
+  emptyComment: { fontSize: 14, color: COLORS.inkSoft, opacity: 0.75 },
+  commentRow: { marginTop: 14 },
+  commentHeadRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  commentMeta: { fontSize: 12, color: COLORS.inkSoft, opacity: 0.75 },
+  commentDelete: { fontSize: 12, color: COLORS.coral },
+  commentContent: { fontSize: 15, color: COLORS.ink, marginTop: 4, lineHeight: 21 },
+
+  commentInputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line,
+    backgroundColor: COLORS.paperRaise,
+  },
+  commentInput: {
+    flex: 1,
+    maxHeight: 100,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: COLORS.ink,
+  },
+  commentSendIcon: { fontSize: 20, color: COLORS.mint, paddingBottom: 8 },
+  commentSendIconDisabled: { opacity: 0.35 },
 });
