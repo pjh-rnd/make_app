@@ -189,6 +189,11 @@ function mapItemToRow(item) {
 //    1,248건 중 740건(59%)이 상시모집이라 날짜 필터를 아무리 좁혀도 "너무 많다"는 문제가 거의
 //    안 줄어드는 게 확인돼서(2026-08-23) 사용자 요청으로 뺌. 스키마의 is_rolling 필드/로직 자체는
 //    남겨둠 — 나중에 다시 포함하고 싶어지면 아래 isWithinSyncWindow 한 줄만 되돌리면 됨.
+//  - **단, money(자산) 카테고리는 상시모집 제외 규칙에서 예외**임(2026-08-23) — 자산형성 상품은
+//    연 1~2회만 짧게 신청받는 특성이라 날짜 창을 아무리 잘 잡아도 대부분 "이미 마감" 아니면
+//    "상시모집(=계속 가입 가능한 상품)"뿐이라, 상시모집까지 빼면 거의 안 남게 됨(48건 중 4건).
+//    반면 청년주택드림청약통장처럼 "상시모집"인 자산상품은 실질적으로 항상 가입 가능한 상태라
+//    계속 보여주는 게 사용자에게 더 유용하다고 판단함.
 // 재동기화(npm run sync-policies)를 다시 돌릴 때마다 이 기준으로 다시 걸러지므로, 시간이
 // 지나면서 창 밖으로 나간 건 자동으로 정리되고(main()의 delete 단계) 새로 창 안에 들어온 건
 // 새로 채워짐 — 그래서 이 스크립트를 주기적으로 재실행하는 게 중요함(아직 자동 스케줄은 없음,
@@ -209,7 +214,7 @@ function computeWindowBounds() {
 }
 
 function isWithinSyncWindow(row, bounds) {
-  if (row.is_rolling) return false; // 상시모집은 동기화 대상에서 제외(위 주석 참고)
+  if (row.is_rolling) return row.category_id === 'money'; // money만 상시모집 제외 규칙에서 예외(위 주석 참고)
   // is_rolling이 false면 resolveDates()에 의해 start_date/deadline_date 둘 다 값이 있음이 보장됨
   return row.start_date <= bounds.maxStartDate && row.deadline_date >= bounds.minDeadlineDate;
 }
@@ -290,7 +295,7 @@ async function main() {
   const allRows = rawItems.map(mapItemToRow);
 
   const bounds = computeWindowBounds();
-  console.log(`  동기화 기간 필터: 시작일 <= ${bounds.maxStartDate} (오늘+${START_WINDOW_MONTHS_AHEAD}달) / 마감일 >= ${bounds.minDeadlineDate} (오늘-${CLOSED_WINDOW_DAYS_BEHIND}일) / 상시모집은 제외`);
+  console.log(`  동기화 기간 필터: 시작일 <= ${bounds.maxStartDate} (오늘+${START_WINDOW_MONTHS_AHEAD}달) / 마감일 >= ${bounds.minDeadlineDate} (오늘-${CLOSED_WINDOW_DAYS_BEHIND}일) / 상시모집은 제외(money 예외)`);
   const rows = allRows.filter((r) => isWithinSyncWindow(r, bounds));
   const excludedRows = allRows.filter((r) => !isWithinSyncWindow(r, bounds));
   console.log(`  기간 필터 결과: ${rows.length}건 유지 / ${excludedRows.length}건 제외 (원본 ${allRows.length}건)`);
