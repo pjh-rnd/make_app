@@ -1,6 +1,19 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  FlatList,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  UIManager,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 
 import { DeadlineCard } from '@/components/deadline-card';
 import { HeaderBackButton } from '@/components/header-back-button';
@@ -19,6 +32,12 @@ import { usePolicySaveCounts } from '@/lib/usePolicySaveCounts';
 import { useProfile } from '@/lib/useProfile';
 import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { useSession } from '@/lib/useSession';
+
+// 안드로이드 구버전 브릿지에서는 LayoutAnimation을 쓰려면 이 플래그를 켜야 함(iOS는 필요 없음,
+// 최신 New Architecture에선 이미 켜져 있을 수도 있지만 안 켜져 있어도 에러 없이 무시됨).
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // 예전엔 홈 화면 안에서 <Modal>로 띄웠는데, 그러면 카드를 눌러 상세 화면으로 이동할 때
 // 모달을 닫아야만 상세 화면이 안 가려져서(모달=화면 전체를 덮는 별도 레이어라 내비게이션과 무관하게
@@ -118,7 +137,34 @@ export default function SearchScreen() {
     setSelectedRegions(new Set());
   }
 
+  // 칩(카테고리/지역/정렬) 줄들이 화면 비중을 꽤 차지해서, 공고를 쭉 내려보는(스크롤 다운) 동안엔
+  // 숨겼다가 다시 위로 올리면(스크롤 업) 바로 보이게 함(2026-08-23 요청) — 트위터/인스타그램
+  // 피드처럼 아래로 볼 때만 헤더가 숨는 패턴. 아주 살짝만 움직여도 반응하면 스크롤이 튈 때마다
+  // 깜빡여서, 어느 정도(10px) 이상 움직였을 때만 반응하게 하고, 맨 위 근처(40px 이내)에서는
+  // 아래로 내려도 숨기지 않음(스크롤 시작하자마자 바로 사라지면 어색해서).
+  const [chipsVisible, setChipsVisible] = useState(true);
+  const lastScrollY = useRef(0);
+
+  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const y = e.nativeEvent.contentOffset.y;
+    const delta = y - lastScrollY.current;
+    if (Math.abs(delta) > 10) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      if (delta > 0 && y > 40) {
+        setChipsVisible(false); // 아래로 스크롤(공고 쭉 보기) → 숨김
+      } else if (delta < 0) {
+        setChipsVisible(true); // 위로 스크롤 → 다시 보임
+      }
+      lastScrollY.current = y;
+    }
+  }
+
   const trimmedQuery = searchQuery.trim();
+  // 영문 대소문자를 구분 안 하게(2026-08-23 수정) — 예전엔 String.includes()가 대소문자를
+  // 그대로 비교해서, 소문자로 입력하면 제목에 대문자로 적힌 영단어(예: "IT", "AI")를 못 찾았음.
+  // 검색어/대상 텍스트 둘 다 소문자로 바꿔서 비교함(한글엔 영향 없음 — toLowerCase는 알파벳이
+  // 아닌 문자는 그대로 둠).
+  const lowerQuery = trimmedQuery.toLowerCase();
 
   // 검색어가 비어있으면 텍스트 필터링 없이 전체 공고를 다 보여줌(빈칸 상태로 열려도 뭐라도 보이게)
   const searchResults = (
@@ -126,9 +172,9 @@ export default function SearchScreen() {
       ? policies
       : policies.filter(
           (d) =>
-            d.title.includes(trimmedQuery) ||
-            d.category.includes(trimmedQuery) ||
-            d.meta.includes(trimmedQuery)
+            d.title.toLowerCase().includes(lowerQuery) ||
+            d.category.toLowerCase().includes(lowerQuery) ||
+            d.meta.toLowerCase().includes(lowerQuery)
         )
   )
     .filter((d) => searchShowAllCategories || searchCategoryIds.has(d.categoryId))
@@ -200,6 +246,12 @@ export default function SearchScreen() {
         />
       </View>
 
+      {/* 카테고리/지역/정렬 칩 3줄 묶음(2026-08-23 개편) — 화면 비중이 크다는 피드백을 받아,
+          아래 FlatList를 스크롤할 때(handleScroll) 방향에 따라 통째로 숨겼다 보였다 함:
+          공고를 쭉 내려보는 동안(아래로 스크롤)엔 숨겨서 목록에 화면을 더 내주고, 위로 스크롤해서
+          다시 올라오면 즉시 다시 보임(트위터/인스타 피드의 접히는 헤더와 같은 패턴). */}
+      {chipsVisible && (
+        <>
       {/* 카테고리 칩 — 홈 화면 관심분야 칩과는 별개로, 검색 결과 안에서만 걸러줌.
           "전체"가 켜져있는 동안은 개별 카테고리를 눌러도 색이 안 들어옴(전체 모드에선 개별 선택
           의미가 없어서) — 개별 카테고리를 누르는 순간 전체가 자동으로 꺼지고 그때부터 색이 켜짐.
@@ -304,6 +356,8 @@ export default function SearchScreen() {
           </Pressable>
         </ScrollView>
       </View>
+        </>
+      )}
 
       {/* 지금 보이는 공고가 총 몇 건인지 — 카테고리·정렬/필터 칩을 누를 때마다 sortedSearchResults가
           다시 계산되니 이 숫자도 자동으로 같이 바뀜(따로 갱신 로직 필요 없음) */}
@@ -346,6 +400,15 @@ export default function SearchScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        // 오른쪽에 스크롤바가 보이게(2026-08-23 요청) — 기본적으로 꺼져있진 않지만 명시적으로
+        // 켜둠. persistentScrollbar는 안드로이드 전용(iOS는 무시됨)이라 안드로이드에서는 스크롤
+        // 안 하고 있을 때도 계속 보이게 함. 실제로 손가락으로 잡고 드래그하는 동작은 iOS/안드로이드
+        // 둘 다 이 얇은 기본 스크롤바를 정확히 짚으면 가능함(운영체제 기본 동작, 앱이 따로 구현한
+        // 건 아님) — 항상 두껍게 보이는 커스텀 스크롤바를 원하면 별도로 더 큰 작업이 필요함.
+        showsVerticalScrollIndicator
+        persistentScrollbar={Platform.OS === 'android'}
       />
     </View>
   );
