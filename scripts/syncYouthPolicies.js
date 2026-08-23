@@ -163,11 +163,32 @@ const PROVINCE_ABBR_TO_FULL = {
   제주: '제주특별자치도',
 };
 
+// "OO시/군/구"처럼 도(道) 이름 바로 다음에 오는 관할 시/군/구 단위 — 2~3글자 + 시/군/구.
+// (예: "평택시", "예천군", "해운대구". "정책과"/"경제국"처럼 부서명은 시/군/구로 끝나지 않아 안 걸림)
+const CITY_UNIT_RE = /^[가-힣]{2,3}(시|군|구)$/;
+
 function resolveRegionKeyword(item) {
   const orgName = (item.sprvsnInstCdNm || item.operInstCdNm || '').trim();
   if (!orgName) return undefined;
-  for (const [abbr, full] of Object.entries(PROVINCE_ABBR_TO_FULL)) {
-    if (orgName.includes(abbr)) return full;
+  const tokens = orgName.split(/\s+/);
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    for (const [abbr, full] of Object.entries(PROVINCE_ABBR_TO_FULL)) {
+      // 경상북도/경상남도/충청북도/충청남도/전라북도/전라남도는 정식 명칭에 "라"/"청"/"상"이 끼어
+      // 있어서 약칭(경북 등)이 정식 명칭의 부분 문자열이 아님(예: "경상북도"에 "경북"이 안 들어있음).
+      // org_name이 정식 명칭 그대로인 정책(2026-08-23 확인 결과 50건)은 약칭만 검사하면 전부
+      // 놓쳐서 regionKeyword가 하나도 안 잡혔음 — 약칭/정식 명칭 둘 다 검사해서 고침.
+      if (!token.includes(abbr) && !token.includes(full)) continue;
+      // 도 이름 바로 다음 토큰이 "평택시"처럼 더 구체적인 시/군/구 단위면 그걸 우선 씀.
+      // 도 단위(예: "경기도")만 저장하면 그 도의 다른 시에 사는 사람도 매칭돼버림 — 실제로
+      // "경기도 평택시 기획항만경제실"이 주관하는, 평택 "관내" 거주자만 대상인 정책이
+      // 도 전체(경기도) 거주자에게 신청 가능하다고 잘못 표시되는 걸 사용자가 발견함(2026-08-23).
+      const next = tokens[i + 1];
+      if (next && CITY_UNIT_RE.test(next) && next !== full) {
+        return next;
+      }
+      return full;
+    }
   }
   return undefined;
 }
