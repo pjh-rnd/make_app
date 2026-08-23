@@ -1,6 +1,8 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -46,6 +48,9 @@ export default function DeadlineDetailScreen() {
   const { summary: aiSummary } = usePolicyAiSummary(item?.id);
   const { comments, post, remove } = usePolicyComments(item?.id, session?.user.id);
   const [commentText, setCommentText] = useState('');
+  // 제목 복사 버튼(2026-08-24 추가) — 눌렀을 때 "복사하기" 작은 글씨가 잠깐 떴다가 사라짐
+  const [showCopiedLabel, setShowCopiedLabel] = useState(false);
+  const copiedLabelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (!item) {
     return (
@@ -77,6 +82,15 @@ export default function DeadlineDetailScreen() {
     const text = commentText;
     setCommentText('');
     await post(text);
+  }
+
+  // 제목을 그대로 복사해서 사용자가 밖에 나가서(포털 검색 등) 직접 찾아볼 수 있게 함(2026-08-24
+  // 요청) — 누르면 "복사하기" 작은 글씨가 1.5초간 떴다가 사라짐
+  async function handleCopyTitle() {
+    await Clipboard.setStringAsync(item!.title);
+    setShowCopiedLabel(true);
+    if (copiedLabelTimer.current) clearTimeout(copiedLabelTimer.current);
+    copiedLabelTimer.current = setTimeout(() => setShowCopiedLabel(false), 1500);
   }
 
   // 링크를 못 열면(주소가 깨졌거나, 그 사이트가 앱으로 못 여는 형태거나) 그냥 빨간 에러 화면이
@@ -116,7 +130,21 @@ export default function DeadlineDetailScreen() {
         </View>
 
         <Text style={[styles.category, { color: catColor }]}>{item.category}</Text>
-        <Text style={styles.title}>{item.title}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{item.title}</Text>
+          {/* 제목 복사 버튼(2026-08-24 추가) — 사람들이 이 제목 그대로 복사해서 밖에서도
+              검색해볼 수 있게. 누르면 "복사하기" 작은 글씨가 잠깐 떴다가 사라짐 */}
+          <View style={styles.copyTitleWrap}>
+            <Pressable onPress={handleCopyTitle} hitSlop={8} style={styles.copyTitleButton}>
+              <MaterialIcons name="content-copy" size={16} color={COLORS.inkSoft} />
+            </Pressable>
+            {showCopiedLabel && (
+              <View style={styles.copiedLabelBubble}>
+                <Text style={styles.copiedLabelText}>복사하기</Text>
+              </View>
+            )}
+          </View>
+        </View>
 
         {/* 상단 핵심 정보 블록(2026-08-23 개편) — "지원혜택"을 제일 눈에 띄게 맨 위에 두고,
             신청기간·정책기관(주관기관)·지역을 그 아래 나란히 둠. 이 화면에만 있던 item.meta
@@ -407,7 +435,23 @@ const styles = StyleSheet.create({
   heartIcon: { fontSize: 26 },
 
   category: { fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
-  title: { fontSize: 28, fontWeight: '700', color: COLORS.ink, marginTop: 7, lineHeight: 36 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  title: { flex: 1, fontSize: 28, fontWeight: '700', color: COLORS.ink, marginTop: 7, lineHeight: 36 },
+  // 제목 복사 버튼 + "복사하기" 말풍선(2026-08-24 추가) — 말풍선은 버튼 바로 위에 절대 위치로
+  // 띄워서,떴다 사라져도 옆 텍스트(제목)가 밀리지 않게 함
+  copyTitleWrap: { marginTop: 11 },
+  copyTitleButton: { padding: 4 },
+  copiedLabelBubble: {
+    position: 'absolute',
+    bottom: '100%',
+    right: -6,
+    marginBottom: 4,
+    backgroundColor: COLORS.ink,
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  copiedLabelText: { fontSize: 11.5, fontWeight: '600', color: COLORS.paper },
 
   // "지원혜택" — 눈에 제일 먼저 띄게 색 있는 박스로 강조(2026-08-23 추가)
   highlightBox: {
