@@ -442,19 +442,22 @@ const styles = StyleSheet.create({
   // 제목 복사 버튼 + "복사하기" 말풍선(2026-08-24 추가, 아이콘 아래에 가로로 뜨도록 수정) —
   // 말풍선은 버튼 바로 밑에 절대 위치로 띄워서, 떴다 사라져도 옆 텍스트(제목)가 밀리지 않게 함.
   // copyTitleWrap에 alignItems: 'flex-start'를 안 주면 절대배치 자식(말풍선)이 부모 폭(아이콘
-  // 크기만큼 좁음)에 맞춰 늘어나면서 글자가 세로로 줄바꿈되는 문제가 있었음 — 내용 폭만큼만
-  // 차지하도록 명시함
+  // 크기만큼 좁음)에 맞춰 늘어나면서 글자가 세로로 줄바꿈되는 문제가 있었음.
   copyTitleWrap: { marginTop: 11, alignItems: 'flex-start' },
   copyTitleButton: { padding: 4 },
+  // 말풍선 폭을 내용 크기에 맡겼더니(2026-08-24) 일부 기기에서 "복사하기" 중 "복"자 하나만
+  // 남기고 잘려 보이는 문제가 있었음(절대배치 + 좁은 부모 조합에서 텍스트 기준 자동 크기 계산이
+  // 기기마다 다르게 됨) — 4글자가 넉넉히 들어갈 고정 폭을 줘서 확실히 해결함.
   copiedLabelBubble: {
     position: 'absolute',
     top: '100%',
     left: 0,
     marginTop: 4,
+    width: 76,
+    alignItems: 'center',
     backgroundColor: COLORS.ink,
     borderRadius: 6,
     paddingVertical: 4,
-    paddingHorizontal: 8,
   },
   copiedLabelText: { fontSize: 11.5, fontWeight: '600', color: COLORS.paper },
 
