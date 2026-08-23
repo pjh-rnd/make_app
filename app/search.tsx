@@ -57,11 +57,13 @@ export default function SearchScreen() {
   // 안 좋고, 위쪽 카테고리 칩 줄 높이가 이상하게 커지는 렌더링 버그도 있어서 그 상태 자체를 없앰
   const [searchShowAllCategories, setSearchShowAllCategories] = useState(true);
   const [searchCategoryIds, setSearchCategoryIds] = useState<Set<string>>(new Set());
-  // 정렬/필터 토글 5개 — 서로 배타적이지 않고 동시에 켤 수 있음(체크박스처럼 각자 독립).
-  // 마감일 빠른 순 정렬은 항상 기본 적용이라 따로 토글을 안 둠
-  const [pinSaved, setPinSaved] = useState(false);
+  // 정렬/필터 토글 4개 — 서로 배타적이지 않고 동시에 켤 수 있음(체크박스처럼 각자 독립).
+  // 마감일 빠른 순 정렬은 항상 기본 적용이라 따로 토글을 안 둠.
+  // "찜만 보기"는 정렬 우선순위가 아니라 순수 필터임(excludeClosed와 같은 성격) — 찜한 것만
+  // 남긴 다음, 그 안에서도 진행 중·예정은 마감일 빠른 순, 마감된 건 최근에 마감된 순으로 정렬됨
   const [pinEligible, setPinEligible] = useState(false);
   const [pinPopular, setPinPopular] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(false);
   const [excludeClosed, setExcludeClosed] = useState(true);
 
   function toggleSearchCategory(catId: string) {
@@ -96,20 +98,15 @@ export default function SearchScreen() {
     .filter((d) => searchShowAllCategories || searchCategoryIds.has(d.categoryId))
     .map((d) => ({ ...d, match: calculateMatch(profile, d.requirements) }));
 
-  const visibleSearchResults = excludeClosed
-    ? searchResults.filter((d) => computeDday(d.startDate, d.deadlineDate).phase !== 'closed')
-    : searchResults;
+  const visibleSearchResults = searchResults
+    .filter((d) => !excludeClosed || computeDday(d.startDate, d.deadlineDate).phase !== 'closed')
+    .filter((d) => !savedOnly || savedIds.has(d.id));
 
-  // "찜 우선"/"지원 가능 우선"/"인기순"이 켜져있으면 그 순서대로 먼저 적용됨 — 사용자가 직접
-  // 켠 정렬 기준이라, 마감된 공고라도 찜이 많거나 인기 많으면 그 기준으로 위로 올라올 수 있음
-  // (마감된 게 아예 보기 싫으면 "마감된 공고 제외"를 쓰면 됨). 아무 정렬도 안 켜져 있을 때만
-  // 마감된 건 기본으로 맨 아래로 보내고, 그 안에서/그 외에서는 마감일 순으로 정렬함
+  // "지원 가능순"/"인기순"이 켜져있으면 그 순서대로 먼저 적용됨 — 사용자가 직접 켠 정렬
+  // 기준이라, 마감된 공고라도 인기 많으면 그 기준으로 위로 올라올 수 있음(마감된 게 아예 보기
+  // 싫으면 "마감된 공고 제외"를 쓰면 됨). 아무 정렬도 안 켜져 있을 때만 마감된 건 기본으로
+  // 맨 아래로 보내고, 그 안에서/그 외에서는 마감일 순으로 정렬함
   const sortedSearchResults = [...visibleSearchResults].sort((a, b) => {
-    if (pinSaved) {
-      const aSaved = savedIds.has(a.id) ? 0 : 1;
-      const bSaved = savedIds.has(b.id) ? 0 : 1;
-      if (aSaved !== bSaved) return aSaved - bSaved;
-    }
     if (pinEligible) {
       const aEligible = a.match.eligible ? 0 : 1;
       const bEligible = b.match.eligible ? 0 : 1;
@@ -195,7 +192,7 @@ export default function SearchScreen() {
         </ScrollView>
       </View>
 
-      {/* 정렬/필터 토글 4개 — 인기순·찜 우선·지원 가능 우선·마감된 공고 제외. "전체"는 카테고리
+      {/* 정렬/필터 토글 4개 — 인기순·지원 가능순·찜만 보기·마감된 공고 제외. "전체"는 카테고리
           칩 줄로 옮겨갔고, 여긴 서로 배타적이지 않아서 전부 동시에 켤 수 있음.
           위 카테고리 줄과 똑같이 바깥 View로 높이를 고정함(overflow:hidden) */}
       <View style={styles.sortRowWrap}>
@@ -209,14 +206,14 @@ export default function SearchScreen() {
             <Text style={[styles.chipText, pinPopular && styles.chipTextActive]}>인기순</Text>
           </Pressable>
           <Pressable
-            onPress={() => setPinSaved((v) => !v)}
-            style={[styles.sortChip, pinSaved && styles.chipActive]}>
-            <Text style={[styles.chipText, pinSaved && styles.chipTextActive]}>찜 우선</Text>
-          </Pressable>
-          <Pressable
             onPress={() => setPinEligible((v) => !v)}
             style={[styles.sortChip, pinEligible && styles.chipActive]}>
-            <Text style={[styles.chipText, pinEligible && styles.chipTextActive]}>지원 가능 우선</Text>
+            <Text style={[styles.chipText, pinEligible && styles.chipTextActive]}>지원 가능순</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSavedOnly((v) => !v)}
+            style={[styles.sortChip, savedOnly && styles.chipActive]}>
+            <Text style={[styles.chipText, savedOnly && styles.chipTextActive]}>찜만 보기</Text>
           </Pressable>
           <Pressable
             onPress={() => setExcludeClosed((v) => !v)}

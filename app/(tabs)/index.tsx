@@ -22,27 +22,23 @@ import { useSavedPolicies } from '@/lib/useSavedPolicies';
 import { useProfile } from '@/lib/useProfile';
 import { useSession } from '@/lib/useSession';
 
-// 'none'(아무 칩도 안 눌린 기본 상태)이면 마감순 — 별도 칩 없이 "기본값"으로만 존재함.
-// 인기순/지원 가능순은 칩을 눌러야 켜지고, 서로 배타적(하나 누르면 다른 하나는 꺼짐)
-type HomeSortMode = 'none' | 'popular' | 'eligible';
-
-// 홈 화면(진행 중/예정/마감)은 어차피 다 찜한 것들이라 "찜 우선"은 의미가 없어서 빼고,
-// 인기순(찜 많은 순)·지원 가능순(안 맞는 조건 적은 순)·마감순(기본값) 중 고르게 함.
-// closed=true(마감 섹션)면 기본값(마감순)이 "최근에 마감된 것 → 오래전에 마감된 것"(내림차순)이고,
-// 그 외(진행 중/예정)는 "마감일 빠른 순"(오름차순) — 둘 다 그냥 "마감일 순"이라고 부르지만
-// 방향이 반대라 마감된 건 옛날 것부터가 아니라 최근 것부터 보이게 함
+// 검색 화면(app/search.tsx)의 인기순/지원 가능순 토글과 똑같이 서로 독립적인 체크박스형
+// 토글임(배타적이지 않음) — 둘 다 켜면 검색 화면과 동일하게 인기순이 먼저 적용되고, 그 안에서
+// 동점일 때만 지원 가능순으로 다시 나뉨. 둘 다 꺼져있으면 기본값(마감순)
 function sortHomeList<T extends { id: string; deadlineDate: string; match: { criteria: { met: boolean }[] } }>(
   items: T[],
-  mode: HomeSortMode,
+  popular: boolean,
+  eligible: boolean,
   saveCounts: Map<string, number>,
   closed = false
 ): T[] {
   return [...items].sort((a, b) => {
-    if (mode === 'popular') {
+    if (popular) {
       const aCount = saveCounts.get(a.id) ?? 0;
       const bCount = saveCounts.get(b.id) ?? 0;
       if (aCount !== bCount) return bCount - aCount;
-    } else if (mode === 'eligible') {
+    }
+    if (eligible) {
       const aUnmet = a.match.criteria.filter((c) => !c.met).length;
       const bUnmet = b.match.criteria.filter((c) => !c.met).length;
       if (aUnmet !== bUnmet) return aUnmet - bUnmet;
@@ -121,16 +117,11 @@ export default function HomeScreen() {
   // 신청 가능한 것과 아직 시작 전인 것을 섞어서 보여주면 헷갈린다고 해서 나눔
   const [showActiveDeadlines, setShowActiveDeadlines] = useState(true);
   const [showBeforeDeadlines, setShowBeforeDeadlines] = useState(true);
-  // "진행 중"·"예정" 두 섹션이 같이 쓰는 정렬 기준 — 아무 칩도 안 누르면 기본값(마감순),
-  // 인기순/지원 가능순 칩을 누르면 그걸로 바뀜. "마감" 섹션은 이 상태와 무관하게 항상
-  // 인기순으로 고정(아래 closedDeadlines 계산 참고)
-  const [homeSortMode, setHomeSortMode] = useState<HomeSortMode>('none');
-
-  // 인기순/지원 가능순은 서로 배타적 — 하나를 누르면 다른 하나는 자동으로 꺼지고,
-  // 이미 켜진 걸 다시 누르면 둘 다 꺼진 기본값(마감순)으로 돌아감
-  function toggleHomeSort(mode: 'popular' | 'eligible') {
-    setHomeSortMode((prev) => (prev === mode ? 'none' : mode));
-  }
+  // "진행 중"·"예정"(그리고 날짜 선택 목록) 세 곳이 같이 쓰는 정렬 토글 — 검색 화면과 똑같이
+  // 인기순/지원 가능순이 서로 독립적인 체크박스라 둘 다 켤 수 있음(배타적이지 않음).
+  // 둘 다 꺼져있으면 기본값(마감순)
+  const [homeSortPopular, setHomeSortPopular] = useState(false);
+  const [homeSortEligible, setHomeSortEligible] = useState(false);
 
   function handleDayPress(day: number) {
     setSelectedDay((prev) => (prev === day ? null : day));
@@ -190,21 +181,23 @@ export default function HomeScreen() {
 
   // computeDday의 phase 3단계(시작 전/진행 중/마감 후)에 그대로 맞춰서 세 섹션으로 나눔 —
   // "진행 중"(지금 신청 가능)·"예정"(아직 신청 시작 전)·"마감"(끝난 것, 기본은 접힌 상태).
-  // 여긴 전부 이미 찜한 것들이라 "지원 가능/찜 우선" 같은 기준은 의미가 없어서, 진행 중·예정은
-  // 사용자가 고른 인기순/마감순(homeSortMode)으로, 마감은 항상 인기순으로 고정해서 정렬함
+  // 사용자가 고른 인기순/지원 가능순 토글(homeSortPopular/homeSortEligible)을 그대로 적용함
   const activeDeadlines = sortHomeList(
     deadlinesWithMatch.filter((d) => computeDday(d.startDate, d.deadlineDate).phase === 'active'),
-    homeSortMode,
+    homeSortPopular,
+    homeSortEligible,
     saveCounts
   );
   const beforeDeadlines = sortHomeList(
     deadlinesWithMatch.filter((d) => computeDday(d.startDate, d.deadlineDate).phase === 'before'),
-    homeSortMode,
+    homeSortPopular,
+    homeSortEligible,
     saveCounts
   );
   const closedDeadlines = sortHomeList(
     deadlinesWithMatch.filter((d) => computeDday(d.startDate, d.deadlineDate).phase === 'closed'),
-    homeSortMode,
+    homeSortPopular,
+    homeSortEligible,
     saveCounts,
     true
   );
@@ -223,12 +216,13 @@ export default function HomeScreen() {
             dt.getDate() === selectedDay
           );
         }).map((d) => ({ ...d, match: calculateMatch(profile, d.requirements) }));
-  // 날짜 선택 시에도 진행 중/예정과 똑같은 인기순/지원 가능순/마감순(기본값) 토글(homeSortMode)을 씀
+  // 날짜 선택 시에도 진행 중/예정과 똑같은 인기순/지원 가능순 토글을 씀
   const selectedDayGroups = CATEGORY_ORDER.map((catId) => ({
     catId,
     items: sortHomeList(
       selectedDayDeadlines.filter((d) => d.categoryId === catId),
-      homeSortMode,
+      homeSortPopular,
+      homeSortEligible,
       saveCounts
     ),
   })).filter((g) => g.items.length > 0);
@@ -253,21 +247,22 @@ export default function HomeScreen() {
     );
   }
 
-  // 진행 중/예정/마감 섹션과 날짜별 목록이 똑같이 쓰는 정렬 토글(인기순/지원 가능순, 기본값 마감순)
+  // 진행 중/예정/마감 섹션과 날짜별 목록이 똑같이 쓰는 정렬 토글 — 검색 화면과 똑같이 인기순/
+  // 지원 가능순이 서로 독립적인 체크박스라 둘 다 켤 수 있음(기본값은 마감순)
   function renderSortToggle() {
     return (
       <View style={styles.homeSortRow}>
         <Pressable
-          onPress={() => toggleHomeSort('popular')}
-          style={[styles.sortChip, homeSortMode === 'popular' && styles.chipActive]}>
-          <Text style={[styles.chipText, homeSortMode === 'popular' && styles.chipTextActive]}>
+          onPress={() => setHomeSortPopular((v) => !v)}
+          style={[styles.sortChip, homeSortPopular && styles.chipActive]}>
+          <Text style={[styles.chipText, homeSortPopular && styles.chipTextActive]}>
             인기순
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => toggleHomeSort('eligible')}
-          style={[styles.sortChip, homeSortMode === 'eligible' && styles.chipActive]}>
-          <Text style={[styles.chipText, homeSortMode === 'eligible' && styles.chipTextActive]}>
+          onPress={() => setHomeSortEligible((v) => !v)}
+          style={[styles.sortChip, homeSortEligible && styles.chipActive]}>
+          <Text style={[styles.chipText, homeSortEligible && styles.chipTextActive]}>
             지원 가능순
           </Text>
         </Pressable>
