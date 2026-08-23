@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { FitMeLogo } from '@/components/fit-me-logo';
 import { HeaderBackButton } from '@/components/header-back-button';
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
 import { computeDday, formatMonthDay } from '@/lib/deadlineUtils';
@@ -147,14 +148,19 @@ export default function DeadlineDetailScreen() {
             {/* "정책 요약"(2026-08-23 추가) — Claude가 정책 원문을 직접 읽고 쓴 요약. 이 3줄만
                 친근한 말투(~해요)고, 아래 지원대상/지원내용/신청방법/준비서류는 두괄식 개조식
                 (- 로 시작하는 짧은 문장/구)으로 씀 — 사용자 요청으로 톤을 구분함.
-                박스는 연두~민트 그라데이션(expo-linear-gradient)으로 친근한 느낌을 줌 —
-                사용자가 "FitMe가 요약했어요!" 문구 + 브랜드 이모지를 요청함(2026-08-23) */}
+                박스는 연두~민트 그라데이션(expo-linear-gradient)으로 친근한 느낌을 줌.
+                뱃지는 이모지 대신 홈 화면 상단바와 같은 FitMeLogo(compact) — 사용자가 "이모지 말고
+                그때 만든 액자 로고 그대로 작게 넣어줘"라고 요청함(2026-08-23). 문구도
+                요약 본문(summaryLine)보다 크게 키움 */}
             <LinearGradient
               colors={[COLORS.limeSoft, COLORS.mintSoft]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.summaryBox}>
-              <Text style={styles.summaryBadge}>🎯 FitMe가 요약했어요!</Text>
+              <View style={styles.summaryBadgeRow}>
+                <FitMeLogo compact />
+                <Text style={styles.summaryBadgeText}>가 요약했어요!</Text>
+              </View>
               <Text style={styles.summaryLine}>정책 안내: {aiSummary.summaryIntro}</Text>
               <Text style={styles.summaryLine}>지원내용: {aiSummary.summarySupport}</Text>
               <Text style={styles.summaryLine}>신청방법: {aiSummary.summaryApply}</Text>
@@ -405,7 +411,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 6,
   },
-  summaryBadge: { fontSize: 13.5, fontWeight: '700', color: COLORS.mint, marginBottom: 2 },
+  summaryBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 4 },
+  // 요약 본문(summaryLine, 14.5)보다 확실히 크게 — 사용자 요청
+  summaryBadgeText: { fontSize: 19, fontWeight: '700', color: COLORS.ink },
   summaryLine: { fontSize: 14.5, color: COLORS.ink, lineHeight: 21 },
 
   infoRow: { flexDirection: 'row', marginTop: 9 },
