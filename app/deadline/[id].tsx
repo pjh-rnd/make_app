@@ -18,6 +18,7 @@ import { computeDday, formatMonthDay } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
 import { extractSupportHighlight, formatPolicyGuide, formatRelativeTime } from '@/lib/policyText';
 import { usePolicies } from '@/lib/usePolicies';
+import { usePolicyAiSummary } from '@/lib/usePolicyAiSummary';
 import { usePolicyComments } from '@/lib/usePolicyComments';
 import { usePolicyDetailExtra } from '@/lib/usePolicyDetailExtra';
 import { useProfile } from '@/lib/useProfile';
@@ -36,6 +37,10 @@ export default function DeadlineDetailScreen() {
   // 목록용 usePolicies()엔 없는(=일부러 안 담은, 아래 훅 주석 참고) 신청방법/제출서류/지원대상
   // 상세/지원내용 원문을 이 화면에서만 따로 조회함
   const { extra } = usePolicyDetailExtra(item?.id);
+  // 사람(Claude)이 정책 원문을 직접 읽고 손으로 채워넣은 요약(2026-08-23 시작,
+  // scripts/policyAiSummaries.js 참고) — 아직 극히 일부 정책에만 있고, 없으면 null이라 아래
+  // 렌더링에서 기존 방식(원문 그대로 보여주기)으로 자연스럽게 대체됨
+  const { summary: aiSummary } = usePolicyAiSummary(item?.id);
   const { comments, post, remove } = usePolicyComments(item?.id, session?.user.id);
   const [commentText, setCommentText] = useState('');
 
@@ -100,7 +105,9 @@ export default function DeadlineDetailScreen() {
         {/* 상단 핵심 정보 블록(2026-08-23 개편) — "지원혜택"을 제일 눈에 띄게 맨 위에 두고,
             신청기간·정책기관(주관기관)·지역을 그 아래 나란히 둠. 이 화면에만 있던 item.meta
             줄("중분류 · 기관명" 텍스트 뭉치)은 여기서 빠짐 — 기관명이 정책기관 줄이랑 겹쳐서. */}
-        {supportHighlight && (
+        {/* "정책 요약"(아래)이 있을 땐 지원내용까지 한 줄로 이미 알려주니, 원문에서 대충 뽑은
+            이 박스는 겹쳐서 생략함 */}
+        {!aiSummary && supportHighlight && (
           <View style={styles.highlightBox}>
             <Text style={styles.highlightLabel}>지원혜택</Text>
             <Text style={styles.highlightValue}>{supportHighlight}</Text>
@@ -121,24 +128,56 @@ export default function DeadlineDetailScreen() {
 
         <View style={styles.divider} />
 
-        {/* "안내" → "정책 안내"로 이름을 바꾸고, 두괄식(핵심 먼저) + "-" 불릿으로 다듬어서 보여줌
-            (2026-08-23 개편). lib/policyText.ts의 formatPolicyGuide 참고. */}
-        <Text style={styles.sectionLabel}>정책 안내</Text>
-        {guide.headline && <Text style={styles.detail}>{guide.headline}</Text>}
-        {guide.bullets.map((line, i) => (
-          <Text key={i} style={styles.bulletLine}>
-            {line}
-          </Text>
-        ))}
-
-        {/* 지원대상 상세(2026-08-23 추가) — 온통청년 원문(addAplyQlfcCndCn)을 그대로 보여줌.
-            연령/지역처럼 우리가 구조화해서 판정하는 조건과 별개로, "관내 거주자만" 같은 원문
-            그대로의 세부 조건을 놓치지 않게 원문도 같이 보여줌 */}
-        {extra?.targetDetail && (
+        {aiSummary ? (
           <>
+            {/* "정책 요약"(2026-08-23 추가) — Claude가 정책 원문을 직접 읽고 쓴 요약. 이 3줄만
+                친근한 말투(~해요)고, 아래 지원대상/지원내용/신청방법/준비서류는 두괄식 개조식
+                (- 로 시작하는 짧은 문장/구)으로 씀 — 사용자 요청으로 톤을 구분함 */}
+            <Text style={styles.sectionLabel}>정책 요약</Text>
+            <View style={styles.summaryBox}>
+              <Text style={styles.summaryLine}>정책 안내: {aiSummary.summaryIntro}</Text>
+              <Text style={styles.summaryLine}>지원내용: {aiSummary.summarySupport}</Text>
+              <Text style={styles.summaryLine}>신청방법: {aiSummary.summaryApply}</Text>
+            </View>
+
             <View style={styles.divider} />
             <Text style={styles.sectionLabel}>지원대상</Text>
-            <Text style={styles.detail}>{extra.targetDetail}</Text>
+            {aiSummary.targetDetail.map((line, i) => (
+              <Text key={i} style={styles.bulletLine}>
+                - {line}
+              </Text>
+            ))}
+
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>지원내용</Text>
+            {aiSummary.supportDetail.map((line, i) => (
+              <Text key={i} style={styles.bulletLine}>
+                - {line}
+              </Text>
+            ))}
+          </>
+        ) : (
+          <>
+            {/* "안내" → "정책 안내"로 이름을 바꾸고, 두괄식(핵심 먼저) + "-" 불릿으로 다듬어서
+                보여줌(2026-08-23 개편). lib/policyText.ts의 formatPolicyGuide 참고. */}
+            <Text style={styles.sectionLabel}>정책 안내</Text>
+            {guide.headline && <Text style={styles.detail}>{guide.headline}</Text>}
+            {guide.bullets.map((line, i) => (
+              <Text key={i} style={styles.bulletLine}>
+                {line}
+              </Text>
+            ))}
+
+            {/* 지원대상 상세(2026-08-23 추가) — 온통청년 원문(addAplyQlfcCndCn)을 그대로 보여줌.
+                연령/지역처럼 우리가 구조화해서 판정하는 조건과 별개로, "관내 거주자만" 같은 원문
+                그대로의 세부 조건을 놓치지 않게 원문도 같이 보여줌 */}
+            {extra?.targetDetail && (
+              <>
+                <View style={styles.divider} />
+                <Text style={styles.sectionLabel}>지원대상</Text>
+                <Text style={styles.detail}>{extra.targetDetail}</Text>
+              </>
+            )}
           </>
         )}
 
@@ -165,26 +204,46 @@ export default function DeadlineDetailScreen() {
           </>
         )}
 
-        {/* 신청방법/제출서류(2026-08-23 추가) — 둘 다 없으면 섹션 자체를 숨김 */}
-        {(extra?.applyMethod || extra?.requiredDocuments) && (
+        {aiSummary ? (
           <>
             <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>어떻게 신청하나요?</Text>
-            {extra?.applyMethod && (
-              <>
-                <Text style={styles.subLabel}>신청방법</Text>
-                <Text style={styles.detail}>{extra.applyMethod}</Text>
-              </>
-            )}
-            {extra?.requiredDocuments && (
-              <>
-                <Text style={[styles.subLabel, extra?.applyMethod && styles.subLabelSpaced]}>
-                  준비 서류
-                </Text>
-                <Text style={styles.detail}>{extra.requiredDocuments}</Text>
-              </>
-            )}
+            <Text style={styles.sectionLabel}>신청방법</Text>
+            {aiSummary.applyMethodDetail.map((line, i) => (
+              <Text key={i} style={styles.bulletLine}>
+                - {line}
+              </Text>
+            ))}
+
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>준비서류 및 준비사항</Text>
+            {aiSummary.documentsDetail.map((line, i) => (
+              <Text key={i} style={styles.bulletLine}>
+                - {line}
+              </Text>
+            ))}
           </>
+        ) : (
+          // 신청방법/제출서류(2026-08-23 추가) — 둘 다 없으면 섹션 자체를 숨김
+          (extra?.applyMethod || extra?.requiredDocuments) && (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>어떻게 신청하나요?</Text>
+              {extra?.applyMethod && (
+                <>
+                  <Text style={styles.subLabel}>신청방법</Text>
+                  <Text style={styles.detail}>{extra.applyMethod}</Text>
+                </>
+              )}
+              {extra?.requiredDocuments && (
+                <>
+                  <Text style={[styles.subLabel, extra?.applyMethod && styles.subLabelSpaced]}>
+                    준비 서류
+                  </Text>
+                  <Text style={styles.detail}>{extra.requiredDocuments}</Text>
+                </>
+              )}
+            </>
+          )
         )}
 
         {/* 관할기관 정보(2026-08-23 추가) — 기관명 + 관련 링크(신청 바로가기/홈페이지 등).
@@ -317,6 +376,17 @@ const styles = StyleSheet.create({
   },
   highlightLabel: { fontSize: 13, fontWeight: '700', color: COLORS.mint },
   highlightValue: { fontSize: 17, fontWeight: '700', color: COLORS.ink },
+
+  // "정책 요약" 박스(2026-08-23 추가) — 지원혜택 박스와 톤을 맞춰 연한 배경을 쓰되, 3줄이라
+  // 세로로 쌓음
+  summaryBox: {
+    backgroundColor: COLORS.mintSoft,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 6,
+  },
+  summaryLine: { fontSize: 14.5, color: COLORS.ink, lineHeight: 21 },
 
   infoRow: { flexDirection: 'row', marginTop: 9 },
   infoLabel: { width: 68, fontSize: 14, color: COLORS.inkSoft, opacity: 0.75 },

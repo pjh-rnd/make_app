@@ -6,6 +6,7 @@
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "sync-policies": "node --env-file=.env ./scripts/syncYouthPolicies.js",
+    "sync-ai-summaries": "node --env-file=.env ./scripts/syncPolicyAiSummaries.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
