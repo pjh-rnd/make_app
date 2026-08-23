@@ -1,4 +1,4 @@
-# Fit Me — 진행 상황 정리 (~2026-08-22 기준)
+# Fit Me — 진행 상황 정리 (~2026-08-23 기준)
 
 > 이 문서는 컴퓨터가 갑자기 꺼지거나(자동 업데이트 등) 세션/대화 맥락이 날아가도, 지금까지
 > 무엇을 왜 이렇게 만들었는지 다시 파악할 수 있게 남겨두는 기록임. Claude(나)가 나중에 다시
@@ -25,15 +25,16 @@
 
 ## 지금 git 상태
 
-- 기본 브랜치는 `main`이지만 최근 큰 구조 변경(찜 탭 제거 등)은 아직 **`main`에 머지 안 함**.
-  사용자가 탭을 2개(홈+전체)로 갈지 3개로 갈지 아직 확정 안 해서, 별도 브랜치에서 작업 중.
-- 현재 작업 브랜치: `feature/more-tab-notifications-social`
-  (`feature/reminders-explore-region-onboarding`에서 분기, `origin`에 push 완료 — commit `b04f92b`).
-- 이 문서를 쓰는 시점 기준, `app/(tabs)/index.tsx`와 `app/search.tsx`에 **커밋 안 된 최신
-  수정사항**이 있음 (검색 화면 정렬칩 개편 + 홈 화면 정렬 토글 동시선택 허용 — 아래 상세 설명).
-  다음에 이어서 작업할 때 `git status`/`git diff`부터 확인할 것.
-- 다른 브랜치들(`feature/saved-search-nearmiss`, `fix/profile-loading-flicker`)은 예전 작업 —
-  머지됐는지 정리가 필요한지는 다시 확인 필요.
+- **2탭(홈+전체) 구조로 최종 확정됨 (2026-08-23)** — 그동안 별도 브랜치에서 보류하던 구조 변경을
+  전부 `main`에 머지 완료. 지금은 `main` 브랜치 하나만 남아있음(작업하던 feature 브랜치들은 머지
+  후 로컬/원격 모두 정리해서 삭제함).
+  - `feature/reminders-explore-region-onboarding` → `main` 머지 (알림 예약, 찜 탭 신설, 지역
+    드롭다운, 로그인 소개문구)
+  - `feature/more-tab-notifications-social` → `main` 머지 (홈=찜 캘린더 구조 개편, 전체 탭,
+    알림 화면 리디자인, 소셜로그인 스캐폴딩, 검색 정렬 개편)
+  - 예전에 있었던 `feature/saved-search-nearmiss`, `fix/profile-loading-flicker`도 이미
+    머지됐던 걸 확인하고 정리 삭제함.
+- 앞으로는 새 작업 시작할 때 `main`에서 새 브랜치를 따는 흐름으로 이어가면 됨.
 
 ## 화면 구조 (현재)
 
@@ -198,9 +199,7 @@
 - [ ] 회원탈퇴 시 실제 Supabase Auth 계정 삭제 — Edge Function(admin API) 필요, 지금은 프로필/찜
   데이터만 지우고 로그아웃함.
 - [ ] "내가 지원한 공고"/커뮤니티(내가 쓴 글/댓글) — 전부 UI만 있고 "준비 중" placeholder.
-- [ ] **2탭 vs 3탭 구조 최종 결정** — 지금 `feature/more-tab-notifications-social` 브랜치는
-  2탭(홈+전체)으로 이미 구현/push 돼있지만, 아직 `main`에 머지 안 함. 사용자가 계속 고민 중이라
-  일부러 머지 보류 상태.
+- [x] ~~2탭 vs 3탭 구조 최종 결정~~ — 2026-08-23, **2탭(홈+전체)으로 확정**하고 `main`에 전부 머지 완료.
 - [ ] 실제 공공 API(온통청년 등) 연동해서 mock 데이터 교체 — [[youth-policy-api-sources]] 참고.
 
 ## 관련 메모리 파일
