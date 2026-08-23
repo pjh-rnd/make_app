@@ -130,6 +130,48 @@ function resolveDates(item) {
   return { startDate: start, deadlineDate: end, isRolling: !start || !end };
 }
 
+// 지역 조건 추정(2026-08-23 추가) — 온통청년엔 정확한 지역 코드(zipCd, 법정동 코드 목록)가
+// 있지만, 코드→지역명으로 정확히 디코딩하려면 별도 코드표가 필요하고 지자체 통합/개편 이슈까지
+// 겹쳐서(예: 원본 데이터에 "전남광주통합특별시"처럼 우리 앱의 17개 시/도 목록엔 없는 지자체명이
+// 실제로 나타남 — lib/profileFields.ts의 PROVINCE_OPTIONS과 안 맞음) 정확한 코드표 유지가
+// 현실적으로 어려움. 대신 주관기관명(sprvsnInstCdNm)에 시/도 축약형이 들어있는지로 추정함 —
+// "산림청"/"중소벤처기업부" 같은 중앙정부 부처는 시/도 이름이 안 들어있어서 자연스럽게 "지역
+// 제한 없음"으로 처리되고, "부산광역시 바이오헬스과"처럼 지자체가 주관이면 그 지역으로 잡힘.
+// 값은 축약형이 아니라 lib/profileFields.ts의 정식 시/도 명칭으로 저장함 — lib/matching.ts의
+// normalizeRegion()이 "전라남도"→"전라남"처럼 원래 명칭 기준으로 접미사를 떼기 때문에, 축약형
+// "전남"을 그대로 넣으면 "전라남"과 문자열이 안 맞아서(글자가 달라서) 매칭이 깨짐 — 반드시 정식
+// 명칭으로 변환해서 넣어야 함.
+// 한계: "전남광주통합특별시"처럼 두 지역이 합쳐진 것처럼 보이는 이름은 먼저 매칭되는 지역 하나만
+// 잡힘(완벽하진 않지만, 지역 조건을 아예 놓치는 것보다는 나음).
+const PROVINCE_ABBR_TO_FULL = {
+  서울: '서울특별시',
+  부산: '부산광역시',
+  대구: '대구광역시',
+  인천: '인천광역시',
+  광주: '광주광역시',
+  대전: '대전광역시',
+  울산: '울산광역시',
+  세종: '세종특별자치시',
+  경기: '경기도',
+  강원: '강원특별자치도',
+  충북: '충청북도',
+  충남: '충청남도',
+  전북: '전북특별자치도',
+  전남: '전라남도',
+  경북: '경상북도',
+  경남: '경상남도',
+  제주: '제주특별자치도',
+};
+
+function resolveRegionKeyword(item) {
+  const orgName = (item.sprvsnInstCdNm || item.operInstCdNm || '').trim();
+  if (!orgName) return undefined;
+  for (const [abbr, full] of Object.entries(PROVINCE_ABBR_TO_FULL)) {
+    if (orgName.includes(abbr)) return full;
+  }
+  return undefined;
+}
+
 // 연령 조건만 비교적 신뢰도 높게 매핑함. 소득 조건(earnCndSeCd/earnMinAmt/earnMaxAmt)은 코드값이라
 // 온통청년 공통코드 조회 없이는 "제한없음"인지 실제 금액 조건인지 구분이 안 돼서, 잘못된 조건으로
 // 사람들을 거르느니 아예 안 넣는 쪽을 택함(추후 공통코드 조회 API 붙이면 채울 것 — 지금은 스킵).
@@ -138,6 +180,10 @@ function resolveRequirements(item) {
   const maxAge = parseInt(item.sprtTrgtMaxAge, 10);
   if (item.sprtTrgtAgeLmtYn === 'Y' && Number.isFinite(maxAge) && maxAge > 0) {
     requirements.maxAge = maxAge;
+  }
+  const regionKeyword = resolveRegionKeyword(item);
+  if (regionKeyword) {
+    requirements.regionKeyword = regionKeyword;
   }
   return requirements;
 }
