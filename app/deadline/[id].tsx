@@ -140,7 +140,9 @@ export default function DeadlineDetailScreen() {
             </Pressable>
             {showCopiedLabel && (
               <View style={styles.copiedLabelBubble}>
-                <Text style={styles.copiedLabelText}>복사하기</Text>
+                <Text style={styles.copiedLabelText} numberOfLines={1}>
+                  복사하기
+                </Text>
               </View>
             )}
           </View>
@@ -437,15 +439,18 @@ const styles = StyleSheet.create({
   category: { fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   title: { flex: 1, fontSize: 28, fontWeight: '700', color: COLORS.ink, marginTop: 7, lineHeight: 36 },
-  // 제목 복사 버튼 + "복사하기" 말풍선(2026-08-24 추가) — 말풍선은 버튼 바로 위에 절대 위치로
-  // 띄워서,떴다 사라져도 옆 텍스트(제목)가 밀리지 않게 함
-  copyTitleWrap: { marginTop: 11 },
+  // 제목 복사 버튼 + "복사하기" 말풍선(2026-08-24 추가, 아이콘 아래에 가로로 뜨도록 수정) —
+  // 말풍선은 버튼 바로 밑에 절대 위치로 띄워서, 떴다 사라져도 옆 텍스트(제목)가 밀리지 않게 함.
+  // copyTitleWrap에 alignItems: 'flex-start'를 안 주면 절대배치 자식(말풍선)이 부모 폭(아이콘
+  // 크기만큼 좁음)에 맞춰 늘어나면서 글자가 세로로 줄바꿈되는 문제가 있었음 — 내용 폭만큼만
+  // 차지하도록 명시함
+  copyTitleWrap: { marginTop: 11, alignItems: 'flex-start' },
   copyTitleButton: { padding: 4 },
   copiedLabelBubble: {
     position: 'absolute',
-    bottom: '100%',
-    right: -6,
-    marginBottom: 4,
+    top: '100%',
+    left: 0,
+    marginTop: 4,
     backgroundColor: COLORS.ink,
     borderRadius: 6,
     paddingVertical: 4,
