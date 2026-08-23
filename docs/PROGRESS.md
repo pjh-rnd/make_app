@@ -510,6 +510,12 @@ GitHub Actions 같은 걸로 매일 자동 실행되게 만드는 게 다음 작
     분기를 통째로 없애고 하나로 합침. 색은 주황(amber) → 검은색(ink) → 회색(inkSoft) 순으로
     두 번 정정받아 결국 원래 색(`COLORS.inkSoft`)으로 돌아옴. `components/deadline-card.tsx`에만
     있던 로직이라 다른 화면엔 영향 없음.
+  - **동기화 기간 필터 재조정(2026-08-23)**: 시작일 1달 이내/마감일 2주 이내 지난 것까지 →
+    사용자 요청으로 **시작일 2주 이내/마감일 1주 이내 지난 것까지**로 더 좁힘
+    (`scripts/syncYouthPolicies.js`의 `START_WINDOW_DAYS_AHEAD`/`CLOSED_WINDOW_DAYS_BEHIND`).
+    재동기화 결과 517건 → **509건**(8건이 좁아진 창 밖으로 나가 삭제됨) — 대부분 정책이
+    longterm(장기/다회차) 판정이라 원래도 시작일이 이미 지나있는 경우가 많아서 변화가 크지
+    않았음.
   - **30건 추가 처리(2026-08-23, 같은 날 이어서)**: 처음엔 517개 전체를 예약(cron)해서 나중에
     처리하려 했다가, 사용자가 "그냥 30개만 지금 해줘"로 축소 요청(예약은 취소함). 마감일이
     가장 임박한 순서로 30개를 골라 [scripts/policyAiSummaries.js](../../../scripts/policyAiSummaries.js)에

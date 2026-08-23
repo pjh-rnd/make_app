@@ -440,8 +440,9 @@ function mapItemToRow(item) {
 // 2,728건을 다 저장하면 너무 많아서(사용자 요청), 동기화 자체를 이 기간 안에 드는 것만 저장하게
 // 걸러냄 — data/deadlines.ts가 예전에 EXPIRY_WINDOW_DAYS로 "마감 14일 지난 건 화면에서 숨김"
 // 하던 것과 비슷한 개념인데, 소스가 Supabase로 옮겨가면서 "저장 자체를 안 함"으로 바뀜:
-//  - 시작일이 오늘로부터 1달 이내(이미 시작한 것도 포함, 즉 start_date <= 오늘+1달)
-//  - 마감일이 2주 이내 지난 것까지(deadline_date >= 오늘-2주)
+//  - 시작일이 오늘로부터 2주 이내(이미 시작한 것도 포함, 즉 start_date <= 오늘+2주) — 원래
+//    1달이었는데 2026-08-23에 사용자 요청으로 2주로 좁힘
+//  - 마감일이 1주 이내 지난 것까지(deadline_date >= 오늘-1주) — 원래 2주였는데 같은 날 1주로 좁힘
 //  - 상시모집(is_rolling)은 **제외**함 — 처음엔 "무조건 포함"이었는데, 실제로 동기화해보니 전체
 //    1,248건 중 740건(59%)이 상시모집이라 날짜 필터를 아무리 좁혀도 "너무 많다"는 문제가 거의
 //    안 줄어드는 게 확인돼서(2026-08-23) 사용자 요청으로 뺌. 스키마의 is_rolling 필드/로직 자체는
@@ -455,8 +456,8 @@ function mapItemToRow(item) {
 // 지나면서 창 밖으로 나간 건 자동으로 정리되고(main()의 delete 단계) 새로 창 안에 들어온 건
 // 새로 채워짐 — 그래서 이 스크립트를 주기적으로 재실행하는 게 중요함(아직 자동 스케줄은 없음,
 // 지금은 수동 실행).
-const START_WINDOW_MONTHS_AHEAD = 1;
-const CLOSED_WINDOW_DAYS_BEHIND = 14;
+const START_WINDOW_DAYS_AHEAD = 14; // 2주
+const CLOSED_WINDOW_DAYS_BEHIND = 7; // 1주
 
 function toIsoDate(d) {
   return d.toISOString().slice(0, 10);
@@ -464,7 +465,7 @@ function toIsoDate(d) {
 
 function computeWindowBounds() {
   const maxStart = new Date();
-  maxStart.setMonth(maxStart.getMonth() + START_WINDOW_MONTHS_AHEAD);
+  maxStart.setDate(maxStart.getDate() + START_WINDOW_DAYS_AHEAD);
   const minDeadline = new Date();
   minDeadline.setDate(minDeadline.getDate() - CLOSED_WINDOW_DAYS_BEHIND);
   return { maxStartDate: toIsoDate(maxStart), minDeadlineDate: toIsoDate(minDeadline) };
@@ -552,7 +553,7 @@ async function main() {
   const allRows = rawItems.map(mapItemToRow);
 
   const bounds = computeWindowBounds();
-  console.log(`  동기화 기간 필터: 시작일 <= ${bounds.maxStartDate} (오늘+${START_WINDOW_MONTHS_AHEAD}달) / 마감일 >= ${bounds.minDeadlineDate} (오늘-${CLOSED_WINDOW_DAYS_BEHIND}일) / 상시모집은 제외(money 예외)`);
+  console.log(`  동기화 기간 필터: 시작일 <= ${bounds.maxStartDate} (오늘+${START_WINDOW_DAYS_AHEAD}일) / 마감일 >= ${bounds.minDeadlineDate} (오늘-${CLOSED_WINDOW_DAYS_BEHIND}일) / 상시모집은 제외(money 예외)`);
   const rows = allRows.filter((r) => isWithinSyncWindow(r, bounds));
   const excludedRows = allRows.filter((r) => !isWithinSyncWindow(r, bounds));
   console.log(`  기간 필터 결과: ${rows.length}건 유지 / ${excludedRows.length}건 제외 (원본 ${allRows.length}건)`);
