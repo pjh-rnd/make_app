@@ -17,7 +17,7 @@ import {
 import { FitMeLogo } from '@/components/fit-me-logo';
 import { HeaderBackButton } from '@/components/header-back-button';
 import { CATEGORY_COLOR, COLORS, ddayStyle } from '@/constants/moa-colors';
-import { computeDday, formatMonthDay } from '@/lib/deadlineUtils';
+import { computeDday, formatMonthDay, isLongPeriodPolicy } from '@/lib/deadlineUtils';
 import { calculateMatch } from '@/lib/matching';
 import { extractSupportHighlight, formatPolicyGuide, formatRelativeTime } from '@/lib/policyText';
 import { usePolicies } from '@/lib/usePolicies';
@@ -63,6 +63,7 @@ export default function DeadlineDetailScreen() {
 
   const { label: ddayLabel, phase } = computeDday(item.startDate, item.deadlineDate);
   const dstyle = ddayStyle(phase);
+  const isLongPeriod = isLongPeriodPolicy(item.startDate, item.deadlineDate);
   const catColor = CATEGORY_COLOR[item.categoryId];
   const match = calculateMatch(profile, item.requirements);
 
@@ -133,15 +134,28 @@ export default function DeadlineDetailScreen() {
           value={
             phase === 'rolling'
               ? '상시 접수 · 신청 기간이 정해져 있지 않아요'
-              : phase === 'longterm'
-                ? '연중 여러 차례 접수 · 정확한 일정은 아래 공식 링크에서 확인하세요'
-                : `${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`
+              : `${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`
           }
         />
         {extra?.orgName ? <InfoRow label="정책기관" value={extra.orgName} /> : null}
         {/* 지역 조건을 항상 명시적으로 보여줌(2026-08-23 추가) — regionKeyword가 없으면 "전국"이라고
             직접 알려줘서, 지역 정보를 아직 못 찾은 건지 진짜 전국 대상인지 헷갈리지 않게 함 */}
         <InfoRow label="지역" value={item.requirements.regionKeyword ?? '전국'} />
+
+        {/* 장기/다회차 안내(2026-08-23) — 카드의 D-day는 원래대로(신청기간 그대로 표시)
+            두되, 신청기간이 90일 넘게 길어서 "이번 회차 마감"으로 못 믿을 정책은 상세 화면에서만
+            이렇게 따로 알려줌(사용자 피드백: "카드는 원래대로, 안내는 공고 안에서"). 온통청년
+            원본이 회차별 접수 기간 대신 사업 전체 운영 기간을 신청기간란에 넣어두는 경우가 실제로
+            많이 발견됨(평택 청년-기업 이어드림/올해의 K-스타트업 등, lib/deadlineUtils.ts
+            LONG_TERM_SPAN_DAYS 주석 참고) */}
+        {isLongPeriod && (
+          <View style={styles.longTermNotice}>
+            <Text style={styles.longTermNoticeText}>
+              📅 이 공고는 연중 여러 차례 접수하는 사업이에요. 위 신청기간은 사업 전체 운영 기간이라,
+              실제 이번 회차 접수 일정은 아래 관할기관 정보의 공식 링크에서 다시 확인해주세요.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.divider} />
 
@@ -406,6 +420,17 @@ const styles = StyleSheet.create({
   },
   highlightLabel: { fontSize: 16, fontWeight: '700', color: COLORS.mint },
   highlightValue: { fontSize: 20, fontWeight: '700', color: COLORS.ink },
+
+  // 장기/다회차 안내 박스(2026-08-23) — highlightBox와 같은 톤(연한 배경 + 진한 텍스트)이되
+  // 주의를 뜻하는 amber 계열로
+  longTermNotice: {
+    backgroundColor: COLORS.amberSoft,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    marginTop: 10,
+  },
+  longTermNoticeText: { fontSize: 15, lineHeight: 22, color: COLORS.amber, fontWeight: '600' },
 
   // "정책 요약" 박스(2026-08-23 추가, 그라데이션으로 다시 손봄) — 연두→민트 밝은 그라데이션으로
   // "FitMe가 직접 요약해준" 느낌을 친근하게 줌(사용자 요청)

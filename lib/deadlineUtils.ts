@@ -3,19 +3,15 @@
 // 급하다고 빨갛게 보이는" 게 이상해서, 지금은 이 단계로만 색을 나눔.
 // 'rolling'(상시모집)은 2026-08-23 실제 온통청년 데이터 연동하면서 추가됨 — 신청 기간이
 // 정해져 있지 않은 정책(청년주택드림청약통장처럼 항상 가입 가능한 상품 등)이 실제로 있어서.
-// 'longterm'(장기/다회차)은 같은 날 나중에 추가됨 — 아래 LONG_TERM_SPAN_DAYS 주석 참고.
-export type Phase = 'before' | 'active' | 'closed' | 'rolling' | 'longterm';
+export type Phase = 'before' | 'active' | 'closed' | 'rolling';
 
 // 온통청년 원본 데이터가 "신청기간"란에 사업 전체 운영 기간(길게는 수년)을 그대로 넣어두는
-// 경우가 실제로 많이 발견됨(2026-08-23, 사용자가 "평택 청년-기업 이어드림 사업"이 실제로는
-// 8/19~8/27인데 앱엔 3/2~10/31로 뜬다고 제보해서 조사하다 발견 — 이 정책은 연중(1~12월)
-// 여러 차례 개별 모집 회차가 도는 프로그램인데, 온통청년 API의 aplyYmd엔 회차별 접수 기간이
-// 아니라 "사업 전체 기간"이 들어있었음). 전수 확인해보니 저장된 508건 중 470건(92%)이 60일
-// 넘는 기간을 가지고 있었고, 그중 상당수는 몇 년(심하면 2020~2029처럼 10년)짜리였음 — 회차별
-// 정확한 접수 기간은 각 지자체 사이트를 일일이 들어가지 않는 이상 알 방법이 없지만("기간
-// 자체가 못 믿을 만큼 길다"는 것 자체는 코드로 감지 가능함. 실제 단일 공고는 대부분 길어야
-// 두어 달 안에 끝나므로, 이 기준을 넘으면 D-day 카운트다운(거짓 정밀도)을 보여주는 대신
-// "연중 여러 차례 접수" 안내로 바꿔서 오해를 막음.
+// 경우가 실제로 많이 발견됨(2026-08-23, "평택 청년-기업 이어드림 사업"이 실제로는 8/19~8/27인데
+// 앱엔 3/2~10/31로 뜬다고 제보해서 조사하다 발견 — 연중 여러 차례 개별 모집 회차가 도는
+// 프로그램인데, aplyYmd엔 회차별 접수 기간이 아니라 "사업 전체 기간"이 들어있었음). 저장된
+// 509건 중 467건(92%)이 이 기준을 넘음 — 처음엔 카드의 D-day 자체를 이걸로 갈아치웠는데,
+// 사용자 피드백으로 **카드/D-day는 원래대로 두고**, 이 여부는 상세 화면에서 "정확한 회차는
+// 공식 링크에서 확인하라"는 안내에만 씀(app/deadline/[id].tsx의 longTermNotice 참고).
 const LONG_TERM_SPAN_DAYS = 90;
 
 function toMidnight(dateStr: string): Date {
@@ -47,23 +43,25 @@ export function computeDday(
   const start = toMidnight(startDate);
   const deadline = toMidnight(deadlineDate);
 
-  // 마감일 자체는 지났으면(기간이 길든 짧든) 진짜로 끝났다고 보는 게 안전한 기본값이라
-  // longterm 판정보다 먼저 검사함.
-  if (today > deadline) {
-    return { label: '마감', phase: 'closed' };
-  }
-
-  if (daysBetween(deadline, start) > LONG_TERM_SPAN_DAYS) {
-    return { label: '연중 접수', phase: 'longterm' };
-  }
-
   if (today < start) {
     const diffDays = daysBetween(start, today);
     return { label: diffDays === 0 ? '오늘 시작' : `시작 D-${diffDays}`, phase: 'before' };
   }
 
-  const diffDays = daysBetween(deadline, today);
-  return { label: diffDays === 0 ? '오늘 마감' : `마감 D-${diffDays}`, phase: 'active' };
+  if (today <= deadline) {
+    const diffDays = daysBetween(deadline, today);
+    return { label: diffDays === 0 ? '오늘 마감' : `마감 D-${diffDays}`, phase: 'active' };
+  }
+
+  return { label: '마감', phase: 'closed' };
+}
+
+// 신청기간이 비정상적으로 길어서(90일 초과) 표시된 날짜를 "이번 회차 마감"으로 믿기 어려운
+// 정책인지 여부. 카드의 D-day 표시엔 안 쓰고(사용자 요청으로 되돌림), 상세 화면에서만
+// "정확한 일정은 공식 링크에서 확인하세요" 안내를 보여줄지 판단하는 데 씀.
+export function isLongPeriodPolicy(startDate: string | null, deadlineDate: string | null): boolean {
+  if (!startDate || !deadlineDate) return false;
+  return daysBetween(toMidnight(deadlineDate), toMidnight(startDate)) > LONG_TERM_SPAN_DAYS;
 }
 
 // 'YYYY-MM-DD' → 'M/D'. 카드에서 신청 시작일·마감일을 짧게 나란히 보여줄 때 씀.

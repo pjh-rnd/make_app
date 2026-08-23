@@ -75,12 +75,9 @@ export const CATEGORY_ICON: Record<string, string> = {
 // - closed(마감 후): 그냥 회색 — 더 이상 의미 없는 상태
 // - rolling(상시모집, 2026-08-23 추가): 파스텔 주황색 — "지금 신청 가능"이라는 점에서 active와
 //   비슷하게 긍정적이지만, 마감이 정해진 active와는 다른 상태라는 걸 색으로도 구분되게 함
-// - longterm(장기/다회차, 2026-08-23 추가): rolling과 똑같은 주황색 — 둘 다 "정확한 단일
-//   마감일을 못 믿는다/안 정해져 있다"는 점에서 사용자에게 같은 의미로 읽혀야 함(lib/deadlineUtils.ts
-//   LONG_TERM_SPAN_DAYS 주석 참고)
 export function ddayStyle(phase: string) {
   if (phase === 'before') return { bg: COLORS.violetSoft, text: COLORS.violet };
   if (phase === 'active') return { bg: COLORS.limeSoft, text: COLORS.lime };
-  if (phase === 'rolling' || phase === 'longterm') return { bg: COLORS.amberSoft, text: COLORS.amber };
+  if (phase === 'rolling') return { bg: COLORS.amberSoft, text: COLORS.amber };
   return { bg: COLORS.closedGraySoft, text: COLORS.closedGray };
 }
