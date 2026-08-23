@@ -465,7 +465,11 @@ GitHub Actions 같은 걸로 매일 자동 실행되게 만드는 게 다음 작
     넣어달라"고 다시 요청해서 [components/fit-me-logo.tsx](../../../components/fit-me-logo.tsx)의
     `<FitMeLogo compact />`(홈 화면 상단바와 완전히 같은 컴포넌트)로 교체하고, 그 옆에
     "가 요약했어요!" 텍스트를 이어붙임(합치면 "Fit Me가 요약했어요!"로 읽힘). 이 문구는 요약
-    본문(14.5)보다 확실히 크게(19, bold) 키움.
+    본문(14.5)보다 확실히 크게(19, bold) 키움. 곧이어 미세조정 2건 더: 로고가 문구에 비해
+    너무 컸어서 [components/fit-me-logo.tsx](../../../components/fit-me-logo.tsx)에 `scale` prop을
+    새로 추가(`compact`/`large` 기준 크기에 배율을 한 번 더 곱함, 기본값 1이라 홈 화면/로그인
+    화면 기존 크기엔 영향 없음)해서 `scale={0.7}`로 로고만 더 축소함. 그라데이션도 연두~민트 →
+    **밝은 하늘색**(`COLORS.skySoft`, 더 밝은 쪽 끝은 새로 추가한 `COLORS.skyPale`)으로 바꿈.
   - **30건 추가 처리(2026-08-23, 같은 날 이어서)**: 처음엔 517개 전체를 예약(cron)해서 나중에
     처리하려 했다가, 사용자가 "그냥 30개만 지금 해줘"로 축소 요청(예약은 취소함). 마감일이
     가장 임박한 순서로 30개를 골라 [scripts/policyAiSummaries.js](../../../scripts/policyAiSummaries.js)에

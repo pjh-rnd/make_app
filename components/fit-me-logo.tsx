@@ -13,41 +13,43 @@ import { COLORS } from '@/constants/moa-colors';
 // 글자도 키워서 액자 안이 꽉 차 보이게 함. 꺾쇠 길이는 더 길게 늘리고, 그만큼 여백은 더 줄여서
 // 꺾쇠가 텍스트 쪽으로 바짝 모여드는(겹쳐 들어오는) 느낌을 냄.
 // compact=true면 홈 화면 상단바처럼 작은 자리에 쓰는 축소판.
-export function FitMeLogo({ compact = false }: { compact?: boolean }) {
-  const longArm = compact ? 24 : 40;
-  const shortArm = compact ? 17 : 26;
-  const thickness = compact ? 6 : 10;
+// scale은 compact/large 두 크기 기준에서 한 번 더 배율을 곱하는 옵션(2026-08-23 추가) — 정책
+// 상세 화면의 "정책 요약" 뱃지처럼 compact보다도 더 작게 써야 하는 자리가 생겨서 추가함
+// (홈 화면/로그인 화면은 scale을 안 넘기니 기본값 1이라 기존 크기 그대로 유지됨).
+export function FitMeLogo({ compact = false, scale = 1 }: { compact?: boolean; scale?: number }) {
+  const longArm = (compact ? 24 : 40) * scale;
+  const shortArm = (compact ? 17 : 26) * scale;
+  const thickness = (compact ? 6 : 10) * scale;
   const radius = thickness / 2;
+  const paddingHorizontal = (compact ? 6 : 10) * scale;
+  const paddingVertical = (compact ? 8 : 16) * scale;
+  const fontSize = (compact ? 29 : 46) * scale;
 
   const bar = { borderRadius: radius, backgroundColor: COLORS.mint };
   const hBar = { ...bar, width: longArm, height: thickness };
   const vBar = { ...bar, width: thickness, height: shortArm };
 
   return (
-    <View style={[styles.frame, compact ? styles.frameCompact : styles.frameLarge]}>
+    <View style={[styles.frame, { paddingHorizontal, paddingVertical }]}>
       <View style={[styles.corner, hBar, { top: 0, left: 0 }]} />
       <View style={[styles.corner, vBar, { top: 0, left: 0 }]} />
       <View style={[styles.corner, hBar, { bottom: 0, right: 0 }]} />
       <View style={[styles.corner, vBar, { bottom: 0, right: 0 }]} />
 
-      <Text style={[styles.text, compact && styles.textCompact]}>Fit Me</Text>
+      <Text style={[styles.text, { fontSize }]}>Fit Me</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   frame: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
-  frameLarge: { paddingHorizontal: 10, paddingVertical: 16 },
-  frameCompact: { paddingHorizontal: 6, paddingVertical: 8 },
 
   corner: { position: 'absolute' },
 
   // 브랜드 타이틀(app/(tabs)/index.tsx, app/login.tsx)과 같은 둥근 서체를 씀
   text: {
-    fontSize: 46,
     fontWeight: '700',
     color: COLORS.ink,
     fontFamily: Platform.select({ ios: 'Arial Rounded MT Bold', android: 'sans-serif-rounded' }),
   },
-  textCompact: { fontSize: 29 },
 });
