@@ -25,6 +25,13 @@ import { supabase } from '@/lib/supabase';
 // 셋 다 이 저장소 코드만으로는 끝낼 수 없는, 각 서비스 콘솔 + Supabase 대시보드 설정이 필요함.
 export type SocialProvider = 'kakao' | 'custom:naver' | 'google';
 
+// Supabase가 카카오 로그인 요청 시 기본으로 "account_email" 동의항목까지 같이 요청하는데,
+// 우리 카카오 앱은 이메일 동의항목이 "권한 없음"(비즈니스 인증 필요) 상태라서 카카오가 그
+// 요청 자체를 거부함(KOE205 에러, 2026-08-24 실제로 겪음). 그래서 우리가 실제로 동의항목에
+// 설정해둔 것(닉네임/프로필 사진)만 명시적으로 요청하도록 scopes를 지정함 — 나중에 카카오
+// 비즈니스 인증을 받아서 이메일 동의항목을 켜면, 여기 문자열에 "account_email"을 추가하면 됨.
+const KAKAO_SCOPES = 'profile_nickname profile_image';
+
 export async function signInWithProvider(
   provider: SocialProvider
 ): Promise<{ error: Error | null; cancelled?: boolean }> {
@@ -32,7 +39,11 @@ export async function signInWithProvider(
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo, skipBrowserRedirect: true },
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+      ...(provider === 'kakao' ? { scopes: KAKAO_SCOPES } : {}),
+    },
   });
   if (error || !data?.url) {
     return { error: error ?? new Error('로그인 주소를 만들지 못했어요.') };
