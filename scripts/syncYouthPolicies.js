@@ -366,6 +366,23 @@ function resolveIncomeRequirement(item) {
   return requirements;
 }
 
+// 무주택 조건 추가(2026-08-24) — Requirements 타입엔 진작부터 requiresNoHouse 필드가 있었고
+// calculateMatch()도 판정 로직이 있었는데, 정작 이 sync 스크립트에 그 값을 채워넣는 코드 자체가
+// 없어서 항상 비어있었음(사용자가 "우리가 공고 잘 분석한거 맞아?"라고 물어봐서 재확인하다가
+// 발견 — AI 요약 쓰면서 읽은 원문엔 "무주택 청년만" 같은 조건이 최소 20건 있었는데 전혀 반영이
+// 안 되고 있었음). earnCndSeCd 같은 구조화된 코드 필드가 따로 없어서(온통청년 API 자체에 무주택
+// 여부를 나타내는 전용 코드가 없음), 정책 설명 텍스트에서 "무주택"이라는 단어를 직접 찾는 방식으로
+// 판단함 — 실측 20건을 다 확인해봤는데 전부 "무주택 청년/세대주/임차인" 같은 실제 자격조건
+// 맥락이었고, "주택소유 무관" 같은 반대 의미의 오탐 사례는 없었음.
+const NO_HOUSE_RE = /무주택/;
+
+function resolveNoHouseRequirement(item) {
+  const text = [item.plcyExplnCn, item.plcySprtCn, item.addAplyQlfcCndCn, item.ptcpPrpTrgtCn, item.plcyNm]
+    .filter(Boolean)
+    .join(' ');
+  return NO_HOUSE_RE.test(text) ? { requiresNoHouse: true } : {};
+}
+
 // 연령 조건 버그 수정(2026-08-24, 사용자가 "만 40세로 넣었는데 만 39세 조건 정책도 지원
 // 가능이라고 뜬다"고 지적해서 발견) — 예전엔 sprtTrgtAgeLmtYn(연령제한여부)이 'Y'일 때만
 // sprtTrgtMaxAge를 반영했는데, 실측해보니 이 플래그가 전혀 안 믿을만했음:
@@ -396,6 +413,7 @@ function resolveRequirements(item) {
   }
   Object.assign(requirements, resolveStatusRequirements(item));
   Object.assign(requirements, resolveIncomeRequirement(item));
+  Object.assign(requirements, resolveNoHouseRequirement(item));
   return requirements;
 }
 
