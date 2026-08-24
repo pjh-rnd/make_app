@@ -51,6 +51,24 @@ export function NaverIcon({ size = 52 }: { size?: number }) {
   );
 }
 
+// 구글은 브랜드 가이드상 흰 배경 + 옅은 테두리 + 파란색 "G"가 가장 흔한 단순화 버전이라 그대로 씀
+// (진짜 4색 "G" 로고는 SVG 없인 View/Text만으로 흉내내기 애매해서, 나중에 정식 에셋으로 교체 가능)
+const GOOGLE_BLUE = '#4285F4';
+
+export function GoogleIcon({ size = 52 }: { size?: number }) {
+  return (
+    <View
+      style={[
+        styles.circle,
+        styles.googleCircle,
+        { width: size, height: size, borderRadius: size / 2 },
+      ]}>
+      <Text style={{ color: GOOGLE_BLUE, fontWeight: '800', fontSize: size * 0.42 }}>G</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   circle: { alignItems: 'center', justifyContent: 'center' },
+  googleCircle: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E3E1D9' },
 });

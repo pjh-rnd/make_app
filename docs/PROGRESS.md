@@ -38,7 +38,7 @@
 
 ## 화면 구조 (현재)
 
-- `app/login.tsx` — 이메일/비번 로그인+회원가입 + 카카오/네이버 "간편로그인" 버튼(스캐폴딩만,
+- `app/login.tsx` — 이메일/비번 로그인+회원가입 + 카카오/네이버/구글 "간편로그인" 버튼(스캐폴딩만,
   아래 참고)
 - `app/(tabs)/_layout.tsx` — 탭 2개: **홈**(`index`) / **전체**(`more`). `explore` 탭은 삭제됨
   (예전엔 "찜한 정책" 탭이었는데 홈 화면에 기능이 흡수됨).
@@ -129,14 +129,21 @@
   스키마 변경 없이 콤마로 join한 여러 id를 저장하는 방식(`packIds`/`unpackIds` 헬퍼,
   `lib/useSavedPolicies.ts`)으로 확장함.
 
-### 6. 소셜 로그인 (카카오/네이버) — **스캐폴딩만, 아직 실제로 안 됨**
+### 6. 소셜 로그인 (카카오/네이버/구글) — **스캐폴딩만, 아직 실제로 안 됨**
 
-- `app/login.tsx` 하단에 "간편로그인" 섹션 추가: 원형 카카오/네이버 아이콘
-  (`components/social-icon.tsx`, 이미지 없이 View로 그림), "최근 로그인" 말풍선 배지가
+- `app/login.tsx` 하단에 "간편로그인" 섹션 추가: 원형 카카오/네이버/구글 아이콘
+  (`components/social-icon.tsx`, 이미지 없이 View/Text로 그림 — 구글은 흰 배경+옅은 테두리+파란
+  "G"로 단순화, 진짜 4색 로고는 SVG 에셋 생기면 교체 가능), "최근 로그인" 말풍선 배지가
   AsyncStorage(`fitme.recentSocialLogin`)로 마지막 사용한 걸 기억해서 그 위에 표시됨.
 - `lib/socialAuth.ts` — Supabase `signInWithOAuth` + `expo-web-browser`/`expo-linking`으로 코드
-  교환하는 로직은 다 짜여 있지만, **카카오/네이버 개발자 콘솔에 앱 등록 + Supabase 대시보드에서
-  provider 설정**을 해야 실제로 로그인이 됨. 이건 외부 작업이라 내가 코드로 대신 할 수 없음.
+  교환하는 로직은 다 짜여 있지만(카카오/네이버/구글 셋 다 이 함수 하나로 공유, `provider` 값만
+  다름), **각 서비스 콘솔에 앱 등록 + Supabase 대시보드에서 provider 설정**을 해야 실제로
+  로그인이 됨. 이건 외부 작업이라 내가 코드로 대신 할 수 없음(각 콘솔/대시보드 로그인이 필요).
+  **구글 추가(2026-08-24)** — 사용자 요청으로 카카오/네이버 스캐폴딩과 똑같은 패턴으로 구글도
+  추가함. 구글은 카카오처럼 Supabase가 기본 지원하는 provider라(네이버처럼 Custom OIDC로 따로
+  등록할 필요 없음) Google Cloud Console에서 OAuth 클라이언트 ID만 발급받아 Supabase 대시보드에
+  등록하면 됨 — 셋 중 설정이 제일 간단함. 아래 "외부 작업 필요" 체크리스트에 셋 다 필요한 절차를
+  구체적으로 적어둠.
 
 ### 7. 프로필/지역 UX 개편
 
@@ -716,8 +723,24 @@ GitHub Actions 같은 걸로 매일 자동 실행되게 만드는 게 다음 작
 
 - [x] ~~`supabase/policy_save_counts.sql`을 Supabase SQL Editor에서 수동 실행~~ — 2026-08-23,
   사용자가 직접 SQL Editor에서 실행 완료. 인기순 정렬/찜 개수 표시 실제로 동작함.
-- [ ] 카카오/네이버 개발자 콘솔에 앱 등록 + Supabase 대시보드 OAuth provider 설정 — 안 하면
-  소셜 로그인 버튼 눌러도 실제 로그인 안 됨.
+- [ ] 카카오/네이버/구글 개발자 콘솔에 앱 등록 + Supabase 대시보드 OAuth provider 설정 — 안 하면
+  소셜 로그인 버튼 눌러도 실제 로그인 안 됨(2026-08-24 현재도 코드만 있고 셋 다 아직 미설정).
+  각각 필요한 절차:
+  - **구글(셋 중 제일 간단)**: [Google Cloud Console](https://console.cloud.google.com/) →
+    프로젝트 생성 → "APIs & Services → Credentials"에서 OAuth 클라이언트 ID 발급(애플리케이션
+    유형: "웹 애플리케이션", 승인된 리디렉션 URI에 Supabase 프로젝트의 콜백 주소
+    `https://<프로젝트ref>.supabase.co/auth/v1/callback` 등록) → Supabase 대시보드
+    (Authentication → Providers → Google)에 발급받은 Client ID/Secret 입력 후 활성화.
+  - **카카오**: [Kakao Developers](https://developers.kakao.com/)에서 앱 생성 → "카카오 로그인"
+    활성화 → 플랫폼에 Redirect URI로 위와 같은 Supabase 콜백 주소 등록 → REST API 키 발급 →
+    Supabase 대시보드(Authentication → Providers → Kakao)에 등록.
+  - **네이버(셋 중 제일 번거로움)**: Supabase가 네이버를 기본 provider로 안 갖고 있어서
+    "Custom OIDC provider"로 등록해야 함 → [네이버 개발자센터](https://developers.naver.com/)에서
+    애플리케이션 등록(네이버 로그인 API 사용 설정, Callback URL에 Supabase 콜백 주소 등록) →
+    Client ID/Secret 발급 → Supabase 대시보드(Authentication → Providers → Custom OIDC, 이름을
+    정확히 "naver"로) 등록.
+  세 서비스 콘솔 다 로그인/가입이 필요한 외부 작업이라 내가 대신 해줄 수 없음 — `lib/socialAuth.ts`
+  주석에도 같은 절차가 요약돼 있음.
 - [ ] 회원탈퇴 시 실제 Supabase Auth 계정 삭제 — Edge Function(admin API) 필요, 지금은 프로필/찜
   데이터만 지우고 로그아웃함.
 - [ ] "내가 지원한 공고"/커뮤니티(내가 쓴 글/댓글) — 전부 UI만 있고 "준비 중" placeholder.

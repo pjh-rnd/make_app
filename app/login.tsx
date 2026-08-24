@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { FitMeLogo } from '@/components/fit-me-logo';
-import { KakaoIcon, NaverIcon } from '@/components/social-icon';
+import { GoogleIcon, KakaoIcon, NaverIcon } from '@/components/social-icon';
 import { COLORS } from '@/constants/moa-colors';
 import { signInWithProvider } from '@/lib/socialAuth';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +23,7 @@ import { useSession } from '@/lib/useSession';
 // 마지막으로 성공한 간편로그인 수단을 기기에 저장해뒀다가, 다음에 로그인 화면에 들어오면
 // 그 아이콘 위에 "최근 로그인" 말풍선을 띄워줌 (카카오/네이버 로그인 앱들이 흔히 쓰는 패턴)
 const RECENT_LOGIN_KEY = 'fitme.recentSocialLogin';
-type SocialMethod = 'kakao' | 'naver';
+type SocialMethod = 'kakao' | 'naver' | 'google';
 
 export default function LoginScreen() {
   const { session, loading: sessionLoading } = useSession();
@@ -39,7 +39,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     AsyncStorage.getItem(RECENT_LOGIN_KEY).then((v) => {
-      if (v === 'kakao' || v === 'naver') setRecentMethod(v);
+      if (v === 'kakao' || v === 'naver' || v === 'google') setRecentMethod(v);
     });
   }, []);
 
@@ -76,7 +76,9 @@ export default function LoginScreen() {
     setErrorMsg('');
     setInfoMsg('');
     setSocialLoading(method);
-    const { error, cancelled } = await signInWithProvider(method === 'kakao' ? 'kakao' : 'custom:naver');
+    const provider =
+      method === 'kakao' ? 'kakao' : method === 'google' ? 'google' : 'custom:naver';
+    const { error, cancelled } = await signInWithProvider(provider);
     setSocialLoading(null);
     if (error) {
       setErrorMsg(error.message);
@@ -186,6 +188,25 @@ export default function LoginScreen() {
             </Pressable>
             <Text style={styles.socialLabel}>네이버</Text>
           </View>
+
+          <View style={styles.socialItem}>
+            {recentMethod === 'google' && (
+              <View style={styles.recentBadge}>
+                <Text style={styles.recentBadgeText}>최근 로그인</Text>
+                <View style={styles.recentBadgeArrow} />
+              </View>
+            )}
+            <Pressable onPress={() => handleSocialLogin('google')} disabled={socialLoading !== null}>
+              {socialLoading === 'google' ? (
+                <View style={styles.socialLoadingCircle}>
+                  <ActivityIndicator color={COLORS.inkSoft} />
+                </View>
+              ) : (
+                <GoogleIcon />
+              )}
+            </Pressable>
+            <Text style={styles.socialLabel}>구글</Text>
+          </View>
         </View>
       </View>
       </ScrollView>
@@ -245,7 +266,9 @@ const styles = StyleSheet.create({
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.line },
   dividerLabel: { fontSize: 12.5, color: COLORS.inkSoft },
-  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 36, marginTop: 22 },
+  // 구글 추가(2026-08-24)로 3개가 됐는데, 원래 gap(36)을 그대로 두면 화면 좁은 기기에서
+  // 살짝 빠듯해서 26으로 줄임
+  socialRow: { flexDirection: 'row', justifyContent: 'center', gap: 26, marginTop: 22 },
   socialItem: { alignItems: 'center', position: 'relative' },
   socialLabel: { fontSize: 12, color: COLORS.inkSoft, marginTop: 8 },
   socialLoadingCircle: {
