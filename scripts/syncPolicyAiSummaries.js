@@ -44,6 +44,12 @@ async function main() {
     );
   }
 
+  // rolling_detail/final_apply_date(2026-08-24 추가 — supabase/policy_ai_summaries.sql의
+  // alter table 부분을 먼저 실행해야 실제로 쓰임)는 값이 있는 항목에만 조건부로 넣음 — 이 두
+  // 컬럼을 하나도 안 쓰는 동안엔 upsert 요청 자체에 아예 안 나타나서, 마이그레이션을 아직
+  // 안 돌린 상태에서도(=DB에 이 컬럼이 없어도) 기존 7개 컬럼은 계속 정상적으로 동기화됨.
+  // 마이그레이션 전에 값 있는 항목을 넣고 돌리면 "컬럼 없음" 에러로 전체 upsert가 실패하니,
+  // rollingDetail/finalApplyDate를 채우기 시작했다면 그 전에 SQL을 먼저 실행해야 함.
   const rows = validSummaries.map((s) => ({
     policy_id: s.policyId,
     summary_intro: s.summaryIntro,
@@ -53,6 +59,8 @@ async function main() {
     support_detail: s.supportDetail,
     apply_method_detail: s.applyMethodDetail,
     documents_detail: s.documentsDetail,
+    ...(s.rollingDetail !== undefined ? { rolling_detail: s.rollingDetail } : {}),
+    ...(s.finalApplyDate !== undefined ? { final_apply_date: s.finalApplyDate } : {}),
   }));
 
   console.log(`policy_ai_summaries에 ${rows.length}건 upsert 중...`);

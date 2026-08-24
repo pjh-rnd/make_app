@@ -31,3 +31,18 @@ create policy "Authenticated users can view policy AI summaries"
   on public.policy_ai_summaries for select
   to authenticated
   using (true);
+
+-- ⚠️ 아래는 2026-08-24 추가 마이그레이션 — 기존에 위 create table을 이미 실행해서 테이블이 있는
+-- 상태라면, Supabase SQL Editor에서 이 부분만 다시 실행해주면 됨(add column if not exists라
+-- 몇 번을 실행해도 안전함, 기존 데이터는 안 건드림).
+--
+-- "연중접수/상시모집"으로 뜨는 정책 중 실제로는 "예산 소진 시 조기마감"이거나 "연 N회 나눠서
+-- 접수" 같은 진짜 운영 방식이 있는데, 지금은 전부 뭉뚱그려서 "상시 접수 · 신청 기간이 정해져
+-- 있지 않아요"라고만 보여주고 있음(사용자 피드백) — 사람이 원문/공식 링크를 직접 찾아 확인해서
+-- 채워넣는 데이터(이 테이블의 다른 컬럼들과 같은 방식, scripts/policyAiSummaries.js 참고).
+-- rolling_detail이 있으면 상세 화면이 그 문장을 그대로 보여주고, 없으면 기존 문구로 자연스럽게
+-- 대체됨(lib/usePolicyAiSummary.ts가 이 컬럼이 아직 없는 상태 — 마이그레이션 전 — 에도 에러 없이
+-- 동작하도록 짜여 있음).
+alter table public.policy_ai_summaries
+  add column if not exists rolling_detail text, -- 예: "이 사업은 연 2~3회 나눠서 접수하며, 예산 소진 시 조기 마감될 수 있어요."
+  add column if not exists final_apply_date date; -- 올해 마지막 회차 마감일을 확인할 수 있었을 때만 채움(못 찾았으면 null)

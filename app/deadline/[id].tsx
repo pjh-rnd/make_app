@@ -161,7 +161,11 @@ export default function DeadlineDetailScreen() {
           label="신청기간"
           value={
             phase === 'rolling'
-              ? '상시 접수 · 신청 기간이 정해져 있지 않아요'
+              ? // finalApplyDate(2026-08-24 추가) — 사람이 원문을 직접 찾아 확인한, 올해 마지막
+                // 접수 회차의 마감일. 아직 확인 안 된 정책이 훨씬 많은 게 정상(그럴 땐 기존 문구)
+                aiSummary?.finalApplyDate
+                ? `상시 접수 · 올해는 ${formatMonthDay(aiSummary.finalApplyDate)}까지 접수해요`
+                : '상시 접수 · 신청 기간이 정해져 있지 않아요'
               : `${formatMonthDay(item.startDate!)} ~ ${formatMonthDay(item.deadlineDate!)}`
           }
         />
@@ -182,8 +186,18 @@ export default function DeadlineDetailScreen() {
           <View style={styles.longTermNotice}>
             <Text style={styles.longTermNoticeText}>
               📅 이 공고는 연중 여러 차례 접수하는 사업이에요. 위 신청기간은 사업 전체 운영 기간이라,
-              실제 이번 회차 접수 일정은 아래 관할기관 정보의 공식 링크에서 다시 확인해주세요.
+              실제 이번 회차 접수 일정은 아래 관련 링크에서 다시 확인해주세요.
             </Text>
+          </View>
+        )}
+
+        {/* rolling(상시모집) 정책의 실제 운영 방식 안내(2026-08-24 추가) — 사람이 원문을 직접
+            찾아서 "연 몇 회 접수"/"예산 소진 시 조기마감" 등 진짜 사정을 확인해 채워넣은 문장.
+            아직 확인 안 된 정책(대부분)은 이 박스 자체를 안 보여줌 — 위 InfoRow의 기존 문구
+            ("신청 기간이 정해져 있지 않아요")로 충분히 자연스럽게 대체됨. */}
+        {phase === 'rolling' && aiSummary?.rollingDetail && (
+          <View style={styles.longTermNotice}>
+            <Text style={styles.longTermNoticeText}>📅 {aiSummary.rollingDetail}</Text>
           </View>
         )}
 

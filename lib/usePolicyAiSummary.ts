@@ -15,7 +15,16 @@ export type PolicyAiSummary = {
   supportDetail: string[];
   applyMethodDetail: string[];
   documentsDetail: string[];
+  // 연중접수/상시모집 정책의 실제 운영 방식(예: "연 2~3회 나눠서 접수") — 2026-08-24 추가,
+  // supabase/policy_ai_summaries.sql의 마이그레이션을 아직 안 돌렸으면 컬럼 자체가 없어서 항상
+  // null로 옴(아래 refresh()가 그 경우도 에러 없이 처리함). 대부분 정책엔 아직 없는 게 정상.
+  rollingDetail: string | null;
+  finalApplyDate: string | null; // YYYY-MM-DD, 못 찾았으면 null
 };
+
+const BASE_COLUMNS =
+  'summary_intro, summary_support, summary_apply, target_detail, support_detail, apply_method_detail, documents_detail';
+const EXTENDED_COLUMNS = `${BASE_COLUMNS}, rolling_detail, final_apply_date`;
 
 export function usePolicyAiSummary(policyId: string | undefined) {
   const [summary, setSummary] = useState<PolicyAiSummary | null>(null);
@@ -28,13 +37,23 @@ export function usePolicyAiSummary(policyId: string | undefined) {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
+    // rolling_detail/final_apply_date는 2026-08-24에 추가된 컬럼이라, 마이그레이션(위 SQL 파일의
+    // alter table 부분)을 아직 안 돌린 프로젝트에서는 이 컬럼들이 없어서 select 자체가 에러남 —
+    // 그러면 기존 7개 컬럼만으로 한 번 더 시도해서, 새 기능 하나 때문에 요약 전체가 안 보이는
+    // 일이 없게 함(마이그레이션 전이든 후든 항상 동작).
+    let { data, error } = await supabase
       .from('policy_ai_summaries')
-      .select(
-        'summary_intro, summary_support, summary_apply, target_detail, support_detail, apply_method_detail, documents_detail'
-      )
+      .select(EXTENDED_COLUMNS)
       .eq('policy_id', policyId)
       .maybeSingle();
+
+    if (error) {
+      ({ data, error } = await supabase
+        .from('policy_ai_summaries')
+        .select(BASE_COLUMNS)
+        .eq('policy_id', policyId)
+        .maybeSingle());
+    }
 
     if (error) {
       // 테이블을 아직 안 만들었거나(supabase/policy_ai_summaries.sql 미실행), 이 정책엔 아직
@@ -59,6 +78,8 @@ export function usePolicyAiSummary(policyId: string | undefined) {
       supportDetail: data.support_detail ?? [],
       applyMethodDetail: data.apply_method_detail ?? [],
       documentsDetail: data.documents_detail ?? [],
+      rollingDetail: 'rolling_detail' in data ? (data.rolling_detail ?? null) : null,
+      finalApplyDate: 'final_apply_date' in data ? (data.final_apply_date ?? null) : null,
     });
     setLoading(false);
   }, [policyId]);
