@@ -723,23 +723,30 @@ GitHub Actions 같은 걸로 매일 자동 실행되게 만드는 게 다음 작
 
 - [x] ~~`supabase/policy_save_counts.sql`을 Supabase SQL Editor에서 수동 실행~~ — 2026-08-23,
   사용자가 직접 SQL Editor에서 실행 완료. 인기순 정렬/찜 개수 표시 실제로 동작함.
-- [ ] 카카오/네이버/구글 개발자 콘솔에 앱 등록 + Supabase 대시보드 OAuth provider 설정 — 안 하면
-  소셜 로그인 버튼 눌러도 실제 로그인 안 됨(2026-08-24 현재도 코드만 있고 셋 다 아직 미설정).
-  각각 필요한 절차:
-  - **구글(셋 중 제일 간단)**: [Google Cloud Console](https://console.cloud.google.com/) →
-    프로젝트 생성 → "APIs & Services → Credentials"에서 OAuth 클라이언트 ID 발급(애플리케이션
-    유형: "웹 애플리케이션", 승인된 리디렉션 URI에 Supabase 프로젝트의 콜백 주소
-    `https://<프로젝트ref>.supabase.co/auth/v1/callback` 등록) → Supabase 대시보드
-    (Authentication → Providers → Google)에 발급받은 Client ID/Secret 입력 후 활성화.
-  - **카카오**: [Kakao Developers](https://developers.kakao.com/)에서 앱 생성 → "카카오 로그인"
-    활성화 → 플랫폼에 Redirect URI로 위와 같은 Supabase 콜백 주소 등록 → REST API 키 발급 →
-    Supabase 대시보드(Authentication → Providers → Kakao)에 등록.
-  - **네이버(셋 중 제일 번거로움)**: Supabase가 네이버를 기본 provider로 안 갖고 있어서
-    "Custom OIDC provider"로 등록해야 함 → [네이버 개발자센터](https://developers.naver.com/)에서
-    애플리케이션 등록(네이버 로그인 API 사용 설정, Callback URL에 Supabase 콜백 주소 등록) →
-    Client ID/Secret 발급 → Supabase 대시보드(Authentication → Providers → Custom OIDC, 이름을
-    정확히 "naver"로) 등록.
-  세 서비스 콘솔 다 로그인/가입이 필요한 외부 작업이라 내가 대신 해줄 수 없음 — `lib/socialAuth.ts`
+- [x] ~~구글 개발자 콘솔 앱 등록 + Supabase 대시보드 OAuth provider 설정~~ — 2026-08-24,
+  사용자가 직접 Google Cloud Console에서 OAuth 클라이언트 발급하고 Supabase에 등록, 웹 테스트로
+  로그인 성공 확인(access_token 정상 발급). 완료.
+- [x] ~~카카오 개발자 콘솔 앱 등록 + Supabase 대시보드 OAuth provider 설정~~ — 2026-08-24, 완료.
+  중간에 겪은 이슈들과 해결 과정(다른 프로젝트에서 카카오/Supabase 조합을 또 설정할 때 참고할 것):
+  - **KOE205(invalid_scope, account_email)**: Supabase의 Kakao provider가 기본적으로
+    `account_email` 동의항목을 요청하는데, 개인 개발자는 이 항목이 "권한 없음" 상태라 카카오가
+    인가 요청 자체를 거부함. `lib/socialAuth.ts`에 `scopes: 'profile_nickname profile_image'`를
+    명시하고 Supabase Kakao 설정의 "Allow users without an email"을 켜도 처음엔 해결 안 됐음.
+  - **진짜 해결책은 비즈 앱 전환**: 카카오 앱 설정 화면에 "사업자 정보 등록 없이, 개인 개발자는
+    본인인증 + 카카오비즈니스 통합 서비스 약관 동의만으로 비즈 앱 전환 가능"이라는 안내가 있었고,
+    그걸로 전환하니 이메일 동의항목이 열림(사업자등록번호나 카카오 데브톡 심사 신청 없이 즉시
+    가능했음 — 웹 검색으로 찾은 "데브톡에 글 올려서 심사받아야 한다"는 정보는 구버전 절차였던
+    것으로 보임).
+  - **KOE006(등록하지 않은 리다이렉트 URI)**: Redirect URI를 카카오 로그인의 "고급" 메뉴에 있는
+    "로그아웃 리다이렉트 URI"에 잘못 등록했었음(로그인용이 아님) — 최신 카카오 UI에서는 로그인용
+    Redirect URI 등록 위치가 "카카오 로그인" 메뉴가 아니라 **[앱] > [플랫폼 키]**로 옮겨가 있었음.
+    거기 등록하고 나서야 로그인 성공.
+- [ ] **네이버(셋 중 제일 번거로움, 2026-08-24 현재 아직 진행 중)**: Supabase가 네이버를 기본
+  provider로 안 갖고 있어서 "Custom OIDC provider"로 등록해야 함 → [네이버 개발자센터](https://developers.naver.com/)에서
+  애플리케이션 등록(네이버 로그인 API 사용 설정, Callback URL에 Supabase 콜백 주소 등록) →
+  Client ID/Secret 발급 → Supabase 대시보드(Authentication → Providers → Custom OIDC, 이름을
+  정확히 "naver"로) 등록.
+  이 외부 콘솔 작업들은 로그인/가입이 필요해서 내가 대신 해줄 수 없음 — `lib/socialAuth.ts`
   주석에도 같은 절차가 요약돼 있음.
 - [ ] 회원탈퇴 시 실제 Supabase Auth 계정 삭제 — Edge Function(admin API) 필요, 지금은 프로필/찜
   데이터만 지우고 로그아웃함.
