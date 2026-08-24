@@ -770,10 +770,11 @@ GitHub Actions 같은 걸로 매일 자동 실행되게 만드는 게 다음 작
 
 ## 아직 안 끝난 것 / 외부 작업 필요 (내가 코드로 못 하는 것들)
 
-- [ ] **`supabase/policy_ai_summaries.sql`의 alter table 부분(2026-08-24 추가분)을 Supabase SQL
-  Editor에서 실행** — `rolling_detail`/`final_apply_date` 컬럼 추가하는 마이그레이션. 안 하면
-  이미 코드/데이터로 준비된 35건의 연중접수 상세 설명이 화면에 안 나타남(에러는 안 남, 그냥 계속
-  기존 문구만 보임). 파일 맨 아래 "2026-08-24 추가 마이그레이션" 주석 밑부분만 다시 실행하면 됨.
+- [x] ~~`supabase/policy_ai_summaries.sql`의 alter table 부분(2026-08-24 추가분)을 Supabase SQL
+  Editor에서 실행~~ — 2026-08-24, 사용자가 직접 실행 완료(처음엔 파일 전체를 실행해서 이미
+  존재하는 `create policy` 줄에서 에러 났었는데, 맨 아래 `alter table` 두 줄만 다시 실행해서
+  해결함). `npm run sync-ai-summaries`로 재동기화해서 35건의 연중접수 상세 설명이 실제로
+  Supabase에 반영된 것까지 확인함.
 - [x] ~~`supabase/policy_save_counts.sql`을 Supabase SQL Editor에서 수동 실행~~ — 2026-08-23,
   사용자가 직접 SQL Editor에서 실행 완료. 인기순 정렬/찜 개수 표시 실제로 동작함.
 - [x] ~~구글 개발자 콘솔 앱 등록 + Supabase 대시보드 OAuth provider 설정~~ — 2026-08-24,
