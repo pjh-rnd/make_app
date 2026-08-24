@@ -399,14 +399,63 @@ function normalizeUrl(raw) {
   return null;
 }
 
+// 관련 링크가 실제로 어디로 연결되는 건지 라벨에 붙여줌(2026-08-24 사용자 요청) — "관련 링크"라고만
+// 뜨면 눌러보기 전엔 뭔지 몰라서 불친절하다는 피드백. URL 도메인을 보고 판단하되:
+//   1) 흔히 쓰는 제3자 플랫폼(구글폼/네이버폼/유튜브 등)은 도메인 패턴으로 바로 알아볼 수 있음
+//   2) 잘 알려진 특정 국가 포털(워크넷/복지로/K-스타트업 등)은 정확한 이름을 붙임
+//   3) 그 외 관공서스러운 도메인(.go.kr/.or.kr)은 이 정책의 주관기관명(item.sprvsnInstCdNm)을
+//      그대로 라벨로 씀 — 신청 링크는 대개 주관기관 자체 사이트이거나 그 기관이 위탁 운영하는
+//      사이트라 이렇게 보는 게 합리적임(100% 정확하진 않을 수 있음 — 여러 정책이 공유하는 통합
+//      포털일 경우 그 포털 자체의 소유 기관이 아니라 "이 정책의" 주관기관명이 뜸)
+//   4) 그 외(사기업 사이트 등)는 도메인 이름 그대로 보여줌 — 아예 안 보여주는 것보단 나음
+const KNOWN_PLATFORM_HOSTS = [
+  [/^(docs\.google\.com|forms\.gle)$/, '구글폼'],
+  [/(^|\.)forms\.office\.com$/, '마이크로소프트 폼'],
+  [/(^|\.)naver\.me$/, '네이버 폼'],
+  [/(^|\.)notion\.site$/, '노션 페이지'],
+  [/(^|\.)youtube\.com$/, '유튜브'],
+  [/^youtu\.be$/, '유튜브'],
+  [/(^|\.)instagram\.com$/, '인스타그램'],
+  [/(^|\.)facebook\.com$/, '페이스북'],
+  [/(^|\.)blog\.naver\.com$/, '네이버 블로그'],
+  [/(^|\.)cafe\.naver\.com$/, '네이버 카페'],
+  [/(^|\.)work\.go\.kr$/, '워크넷'],
+  [/(^|\.)work24\.go\.kr$/, '워크24'],
+  [/(^|\.)bokjiro\.go\.kr$/, '복지로'],
+  [/(^|\.)k-startup\.go\.kr$/, 'K-스타트업'],
+  [/(^|\.)kosaf\.go\.kr$/, '한국장학재단'],
+  [/(^|\.)youthcenter\.go\.kr$/, '온통청년'],
+  [/(^|\.)gov\.kr$/, '정부24'],
+  [/(^|\.)applyhome\.co\.kr$/, '청약홈'],
+];
+
+function classifyLinkSource(url, orgName) {
+  let host;
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+  for (const [re, label] of KNOWN_PLATFORM_HOSTS) {
+    if (re.test(host)) return label;
+  }
+  if (/\.(go|or)\.kr$/.test(host) && orgName) return orgName;
+  return host; // 마지막 수단: 뭔지 몰라도 최소한 도메인 이름은 보여줌
+}
+
 function resolveLinks(item) {
   const links = [];
+  const orgName = (item.sprvsnInstCdNm || '').trim() || null;
   const apply = normalizeUrl(item.aplyUrlAddr);
   const ref1 = normalizeUrl(item.refUrlAddr1);
   const ref2 = normalizeUrl(item.refUrlAddr2);
-  if (apply) links.push({ label: '신청 바로가기', url: apply });
-  if (ref1 && ref1 !== apply) links.push({ label: '관련 링크', url: ref1 });
-  if (ref2 && ref2 !== apply && ref2 !== ref1) links.push({ label: '관련 링크 2', url: ref2 });
+  const withSource = (baseLabel, url) => {
+    const source = classifyLinkSource(url, orgName);
+    return { label: source ? `${baseLabel} · ${source}` : baseLabel, url };
+  };
+  if (apply) links.push(withSource('신청 바로가기', apply));
+  if (ref1 && ref1 !== apply) links.push(withSource('관련 링크', ref1));
+  if (ref2 && ref2 !== apply && ref2 !== ref1) links.push(withSource('관련 링크 2', ref2));
   return links;
 }
 

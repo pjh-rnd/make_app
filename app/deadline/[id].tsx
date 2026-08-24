@@ -320,13 +320,23 @@ export default function DeadlineDetailScreen() {
           )
         )}
 
-        {/* 관할기관 정보(2026-08-23 추가) — 기관명 + 관련 링크(신청 바로가기/홈페이지 등).
-            ⚠️ 온통청년 API엔 기관 전화번호 필드가 따로 없어서(신청 URL만 제공) 전화번호는 못 넣음 */}
-        {(extra?.orgName || item.links.length > 0) && (
+        {/* 관할기관 정보(2026-08-23 추가) — 기관명만. ⚠️ 온통청년 API엔 기관 전화번호 필드가
+            따로 없어서(신청 URL만 제공) 전화번호는 못 넣음 */}
+        {extra?.orgName && (
           <>
             <View style={styles.divider} />
             <Text style={styles.sectionLabel}>관할기관 정보</Text>
-            {extra?.orgName && <Text style={styles.detail}>{extra.orgName}</Text>}
+            <Text style={styles.detail}>{extra.orgName}</Text>
+          </>
+        )}
+
+        {/* 관련 링크(2026-08-24 요청으로 관할기관 정보와 분리된 별도 섹션) — 각 링크가 어디로
+            연결되는지(산림청/구글폼 등) scripts/syncYouthPolicies.js의 resolveLinks()가 라벨에
+            이미 붙여서 줌(URL 도메인 기반 자동 분류, 100% 정확은 아닐 수 있음) */}
+        {item.links.length > 0 && (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>관련 링크</Text>
             {item.links.map((link) => (
               <Pressable key={link.url} onPress={() => handleOpenLink(link.url)}>
                 <Text style={styles.link}>🔗 {link.label}</Text>
