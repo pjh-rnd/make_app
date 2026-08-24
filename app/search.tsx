@@ -246,121 +246,9 @@ export default function SearchScreen() {
         />
       </View>
 
-      {/* 카테고리/지역/정렬 칩 3줄 묶음(2026-08-23 개편) — 화면 비중이 크다는 피드백을 받아,
-          아래 FlatList를 스크롤할 때(handleScroll) 방향에 따라 통째로 숨겼다 보였다 함:
-          공고를 쭉 내려보는 동안(아래로 스크롤)엔 숨겨서 목록에 화면을 더 내주고, 위로 스크롤해서
-          다시 올라오면 즉시 다시 보임(트위터/인스타 피드의 접히는 헤더와 같은 패턴). */}
-      {chipsVisible && (
-        <>
-      {/* 카테고리 칩 — 홈 화면 관심분야 칩과는 별개로, 검색 결과 안에서만 걸러줌.
-          "전체"가 켜져있는 동안은 개별 카테고리를 눌러도 색이 안 들어옴(전체 모드에선 개별 선택
-          의미가 없어서) — 개별 카테고리를 누르는 순간 전체가 자동으로 꺼지고 그때부터 색이 켜짐.
-          "전체"는 카테고리가 아니라서 CATEGORY_ORDER엔 없고, 맨 왼쪽에 하늘색으로 따로 얹음 */}
-      {/* ScrollView 자체의 style={{height}}만으로는 안 먹힐 때가 있어서(내부 콘텐츠 크기를
-          측정해서 그 크기로 다시 부풀리는 경우가 있음), 바깥에 높이 고정된 일반 View를 하나 더
-          씌우고 overflow:hidden으로 확실하게 그 높이 밖으로 못 나가게 막음 */}
-      <View style={styles.categoryChipWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryChipRow}>
-          <Pressable
-            onPress={selectAllSearchCategories}
-            style={[
-              styles.categoryChip,
-              // COLORS.sky는 "교육" 카테고리 색이랑 같은 값이라 여기서 그대로 쓰면 너무 진한 파랑으로
-              // 보여서, "전체" 칩만 더 밝은 진짜 하늘색(skyblue)을 따로 씀
-              searchShowAllCategories && { backgroundColor: '#4FC3EE', borderColor: '#4FC3EE' },
-            ]}>
-            <Text style={[styles.categoryChipText, searchShowAllCategories && styles.chipTextActive]}>
-              전체
-            </Text>
-          </Pressable>
-          {CATEGORY_ORDER.map((catId) => {
-            const active = !searchShowAllCategories && searchCategoryIds.has(catId);
-            return (
-              <Pressable
-                key={catId}
-                onPress={() => toggleSearchCategory(catId)}
-                style={[
-                  styles.categoryChip,
-                  active && { backgroundColor: CATEGORY_COLOR[catId], borderColor: CATEGORY_COLOR[catId] },
-                ]}>
-                <Text style={[styles.categoryChipText, active && styles.chipTextActive]}>
-                  {CATEGORY_ICON[catId]} {CATEGORY_LABEL[catId]}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* 지역 필터(2026-08-23 추가) — 17개 시/도 중 여러 개를 동시에 켤 수 있음(카테고리 칩과 같은
-          패턴). "경기도"를 켜면 "평택시"처럼 그 도 안의 시/군/구 단위로 더 구체화된 공고도 같이
-          보임(requirements.regionProvince가 항상 상위 도까지 저장해두기 때문) — 실제 신청 자격은
-          카드에 뜨는 "지원 가능"/"조건 미충족" 배지가 regionKeyword로 더 정확하게 따로 판정하니,
-          이 필터는 "대충 내 지역 위주로 보기" 용도로만 씀. 색은 아래 정렬/필터 줄(진한 회색)보다
-          한 단계 연하게 둬서 "이 줄부터 필터가 시작된다"는 느낌 없이 카테고리 줄과 자연스럽게
-          이어지게 함 */}
-      <View style={styles.regionChipWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.regionChipRow}>
-          <Pressable
-            onPress={selectAllRegions}
-            style={[styles.regionChip, regionShowAll && styles.chipActive]}>
-            <Text style={[styles.chipText, regionShowAll && styles.chipTextActive]}>전체</Text>
-          </Pressable>
-          {PROVINCES.map((p) => {
-            const active = !regionShowAll && selectedRegions.has(p.id);
-            return (
-              <Pressable
-                key={p.id}
-                onPress={() => toggleRegion(p.id)}
-                style={[styles.regionChip, active && styles.chipActive]}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{p.label}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {/* 정렬/필터 토글 4개 — 인기순·지원 가능순·찜만 보기·마감된 공고 제외. "전체"는 카테고리
-          칩 줄로 옮겨갔고, 여긴 서로 배타적이지 않아서 전부 동시에 켤 수 있음.
-          위 카테고리 줄과 똑같이 바깥 View로 높이를 고정함(overflow:hidden) */}
-      <View style={styles.sortRowWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sortRow}>
-          <Pressable
-            onPress={() => setPinPopular((v) => !v)}
-            style={[styles.sortChip, pinPopular && styles.chipActive]}>
-            <Text style={[styles.chipText, pinPopular && styles.chipTextActive]}>인기순</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setPinEligible((v) => !v)}
-            style={[styles.sortChip, pinEligible && styles.chipActive]}>
-            <Text style={[styles.chipText, pinEligible && styles.chipTextActive]}>지원 가능순</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setSavedOnly((v) => !v)}
-            style={[styles.sortChip, savedOnly && styles.chipActive]}>
-            <Text style={[styles.chipText, savedOnly && styles.chipTextActive]}>찜만 보기</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setExcludeClosed((v) => !v)}
-            style={[styles.sortChip, excludeClosed && styles.chipActive]}>
-            <Text style={[styles.chipText, excludeClosed && styles.chipTextActive]}>마감된 공고 제외</Text>
-          </Pressable>
-        </ScrollView>
-      </View>
-        </>
-      )}
-
       {/* 지금 보이는 공고가 총 몇 건인지 — 카테고리·정렬/필터 칩을 누를 때마다 sortedSearchResults가
-          다시 계산되니 이 숫자도 자동으로 같이 바뀜(따로 갱신 로직 필요 없음) */}
+          다시 계산되니 이 숫자도 자동으로 같이 바뀜(따로 갱신 로직 필요 없음). 칩과 달리 스크롤해도
+          안 숨는 고정 줄이라 항상 같은 자리에 있음 — 아래 listWrap보다 위, header 바로 밑 */}
       <Text style={styles.resultCount}>총 {sortedSearchResults.length}건</Text>
 
       {/* scripts/syncYouthPolicies.js가 온통청년 API에서 데이터를 가져올 때 이미 이 기간
@@ -370,46 +258,176 @@ export default function SearchScreen() {
         마감 2주 이내 · 시작 1달 이내인 공고만 모아봤어요
       </Text>
 
-      {/* 검색어가 비어있으면 기본으로 전체 공고(500건 넘음)가 다 보이는데, 예전엔 이걸 그냥
-          ScrollView 안에서 .map()으로 한꺼번에 다 그렸었음 — 화면에 안 보이는 카드까지 전부
-          한 번에 렌더링하느라 검색 화면 진입 자체가 눈에 띄게 느려지는 원인이었음(2026-08-23).
-          FlatList는 화면에 실제로 보이는 카드 몇 개만 먼저 그리고, 스크롤하면서 나머지를
-          그때그때 그려주는(가상화) 리스트라 카드 개수가 아무리 많아도 처음 그리는 비용이
-          거의 고정됨.
-          keyboardShouldPersistTaps="handled" — 이게 없으면 키보드가 떠있는 상태에서 카드를 눌렀을 때
-          첫 탭은 키보드만 내려가고(터치가 카드까지 안 전달됨) 한 번 더 눌러야 이동되는 문제가 있음 */}
-      <FlatList
-        data={sortedSearchResults}
-        keyExtractor={(d) => d.id}
-        renderItem={({ item: d }) => (
-          <DeadlineCard
-            item={d}
-            hasProfile={hasProfile}
-            isSaved={savedIds.has(d.id)}
-            onToggleSave={async () => {
-              await toggleSaved({ id: d.id, title: d.title, deadlineDate: d.deadlineDate });
-              refreshSaveCounts();
-            }}
-            saveCount={saveCounts.get(d.id) ?? 0}
-            // 검색 화면 카드 안 "공고문" 글자만 키움(D-day 배지는 그대로 두라는 요청, 2026-08-23)
-            // — 처음 1.2배가 과하다는 피드백을 받아 1.07배로 축소 조정함
-            fontScale={1.07}
-          />
+      {/* 리스트 영역(2026-08-24 재구성) — 예전엔 칩 3줄(chipsVisible)이 FlatList "위"의 평범한
+          형제 요소라서, 칩이 사라지면 그 밑 형제들(FlatList 포함)이 전부 그 빈자리로 끌어올려져서
+          "지금 보고 있던 공고 카드가 갑자기 위로 튀어 오르는" 문제가 있었음(사용자 피드백). 그래서
+          FlatList를 이 View(position:relative, flex:1) 안에서 항상 화면 전체 높이를 그대로 차지하게
+          두고, 칩 3줄은 그 "위에 얹히는 절대배치 오버레이"로 바꿈 — 칩이 보일 땐 리스트 맨 위쪽을
+          덮어서 지금까지와 똑같아 보이고, 칩이 사라질 땐 리스트 자체는 자리를 1px도 안 옮긴 채로
+          그 밑에 원래 있던(칩에 가려져 있던) 카드가 그대로 드러남. 즉 "카드가 위로 이동"하는 게
+          아니라 "카드를 가리던 칩이 사라지는" 것 — 카드 위치는 완전히 고정됨. */}
+      <View style={styles.listWrap}>
+        {/* 검색어가 비어있으면 기본으로 전체 공고(500건 넘음)가 다 보이는데, 예전엔 이걸 그냥
+            ScrollView 안에서 .map()으로 한꺼번에 다 그렸었음 — 화면에 안 보이는 카드까지 전부
+            한 번에 렌더링하느라 검색 화면 진입 자체가 눈에 띄게 느려지는 원인이었음(2026-08-23).
+            FlatList는 화면에 실제로 보이는 카드 몇 개만 먼저 그리고, 스크롤하면서 나머지를
+            그때그때 그려주는(가상화) 리스트라 카드 개수가 아무리 많아도 처음 그리는 비용이
+            거의 고정됨.
+            keyboardShouldPersistTaps="handled" — 이게 없으면 키보드가 떠있는 상태에서 카드를 눌렀을 때
+            첫 탭은 키보드만 내려가고(터치가 카드까지 안 전달됨) 한 번 더 눌러야 이동되는 문제가 있음 */}
+        <FlatList
+          style={styles.list}
+          data={sortedSearchResults}
+          keyExtractor={(d) => d.id}
+          renderItem={({ item: d }) => (
+            <DeadlineCard
+              item={d}
+              hasProfile={hasProfile}
+              isSaved={savedIds.has(d.id)}
+              onToggleSave={async () => {
+                await toggleSaved({ id: d.id, title: d.title, deadlineDate: d.deadlineDate });
+                refreshSaveCounts();
+              }}
+              saveCount={saveCounts.get(d.id) ?? 0}
+              // 검색 화면 카드 안 "공고문" 글자만 키움(D-day 배지는 그대로 두라는 요청, 2026-08-23)
+              // — 처음 1.2배가 과하다는 피드백을 받아 1.07배로 축소 조정함
+              fontScale={1.07}
+            />
+          )}
+          ListEmptyComponent={<Text style={styles.emptyText}>검색 결과가 없어요</Text>}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          // 오른쪽에 스크롤바가 보이게(2026-08-23 요청) — 기본적으로 꺼져있진 않지만 명시적으로
+          // 켜둠. persistentScrollbar는 안드로이드 전용(iOS는 무시됨)이라 안드로이드에서는 스크롤
+          // 안 하고 있을 때도 계속 보이게 함. 실제로 손가락으로 잡고 드래그하는 동작은 iOS/안드로이드
+          // 둘 다 이 얇은 기본 스크롤바를 정확히 짚으면 가능함(운영체제 기본 동작, 앱이 따로 구현한
+          // 건 아님) — 항상 두껍게 보이는 커스텀 스크롤바를 원하면 별도로 더 큰 작업이 필요함.
+          showsVerticalScrollIndicator
+          persistentScrollbar={Platform.OS === 'android'}
+        />
+
+        {/* 카테고리/지역/정렬 칩 3줄 묶음(2026-08-23 개편, 2026-08-24 오버레이로 재구성) — 위
+            FlatList "위에 얹히는" 절대배치 레이어라 이게 나타나거나 사라져도 FlatList 자신의
+            위치/높이는 전혀 안 바뀜(그래서 카드가 안 튐). 배경을 명시적으로 COLORS.paper로 칠해서
+            뒤에 있는 카드가 비쳐 보이지 않게 함. */}
+        {chipsVisible && (
+          <View style={styles.chipsOverlay}>
+            {/* 카테고리 칩 — 홈 화면 관심분야 칩과는 별개로, 검색 결과 안에서만 걸러줌.
+                "전체"가 켜져있는 동안은 개별 카테고리를 눌러도 색이 안 들어옴(전체 모드에선 개별 선택
+                의미가 없어서) — 개별 카테고리를 누르는 순간 전체가 자동으로 꺼지고 그때부터 색이 켜짐.
+                "전체"는 카테고리가 아니라서 CATEGORY_ORDER엔 없고, 맨 왼쪽에 하늘색으로 따로 얹음 */}
+            {/* ScrollView 자체의 style={{height}}만으로는 안 먹힐 때가 있어서(내부 콘텐츠 크기를
+                측정해서 그 크기로 다시 부풀리는 경우가 있음), 바깥에 높이 고정된 일반 View를 하나 더
+                씌우고 overflow:hidden으로 확실하게 그 높이 밖으로 못 나가게 막음 */}
+            <View style={styles.categoryChipWrap}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryChipRow}>
+                <Pressable
+                  onPress={selectAllSearchCategories}
+                  style={[
+                    styles.categoryChip,
+                    // COLORS.sky는 "교육" 카테고리 색이랑 같은 값이라 여기서 그대로 쓰면 너무 진한 파랑으로
+                    // 보여서, "전체" 칩만 더 밝은 진짜 하늘색(skyblue)을 따로 씀
+                    searchShowAllCategories && { backgroundColor: '#4FC3EE', borderColor: '#4FC3EE' },
+                  ]}>
+                  <Text
+                    style={[styles.categoryChipText, searchShowAllCategories && styles.chipTextActive]}>
+                    전체
+                  </Text>
+                </Pressable>
+                {CATEGORY_ORDER.map((catId) => {
+                  const active = !searchShowAllCategories && searchCategoryIds.has(catId);
+                  return (
+                    <Pressable
+                      key={catId}
+                      onPress={() => toggleSearchCategory(catId)}
+                      style={[
+                        styles.categoryChip,
+                        active && {
+                          backgroundColor: CATEGORY_COLOR[catId],
+                          borderColor: CATEGORY_COLOR[catId],
+                        },
+                      ]}>
+                      <Text style={[styles.categoryChipText, active && styles.chipTextActive]}>
+                        {CATEGORY_ICON[catId]} {CATEGORY_LABEL[catId]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* 지역 필터(2026-08-23 추가) — 17개 시/도 중 여러 개를 동시에 켤 수 있음(카테고리 칩과 같은
+                패턴). "경기도"를 켜면 "평택시"처럼 그 도 안의 시/군/구 단위로 더 구체화된 공고도 같이
+                보임(requirements.regionProvince가 항상 상위 도까지 저장해두기 때문) — 실제 신청 자격은
+                카드에 뜨는 "지원 가능"/"조건 미충족" 배지가 regionKeyword로 더 정확하게 따로 판정하니,
+                이 필터는 "대충 내 지역 위주로 보기" 용도로만 씀. 색은 아래 정렬/필터 줄(진한 회색)보다
+                한 단계 연하게 둬서 "이 줄부터 필터가 시작된다"는 느낌 없이 카테고리 줄과 자연스럽게
+                이어지게 함 */}
+            <View style={styles.regionChipWrap}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.regionChipRow}>
+                <Pressable
+                  onPress={selectAllRegions}
+                  style={[styles.regionChip, regionShowAll && styles.chipActive]}>
+                  <Text style={[styles.chipText, regionShowAll && styles.chipTextActive]}>전체</Text>
+                </Pressable>
+                {PROVINCES.map((p) => {
+                  const active = !regionShowAll && selectedRegions.has(p.id);
+                  return (
+                    <Pressable
+                      key={p.id}
+                      onPress={() => toggleRegion(p.id)}
+                      style={[styles.regionChip, active && styles.chipActive]}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{p.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* 정렬/필터 토글 4개 — 인기순·지원 가능순·찜만 보기·마감된 공고 제외. "전체"는 카테고리
+                칩 줄로 옮겨갔고, 여긴 서로 배타적이지 않아서 전부 동시에 켤 수 있음.
+                위 카테고리 줄과 똑같이 바깥 View로 높이를 고정함(overflow:hidden) */}
+            <View style={styles.sortRowWrap}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.sortRow}>
+                <Pressable
+                  onPress={() => setPinPopular((v) => !v)}
+                  style={[styles.sortChip, pinPopular && styles.chipActive]}>
+                  <Text style={[styles.chipText, pinPopular && styles.chipTextActive]}>인기순</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setPinEligible((v) => !v)}
+                  style={[styles.sortChip, pinEligible && styles.chipActive]}>
+                  <Text style={[styles.chipText, pinEligible && styles.chipTextActive]}>지원 가능순</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setSavedOnly((v) => !v)}
+                  style={[styles.sortChip, savedOnly && styles.chipActive]}>
+                  <Text style={[styles.chipText, savedOnly && styles.chipTextActive]}>찜만 보기</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setExcludeClosed((v) => !v)}
+                  style={[styles.sortChip, excludeClosed && styles.chipActive]}>
+                  <Text style={[styles.chipText, excludeClosed && styles.chipTextActive]}>
+                    마감된 공고 제외
+                  </Text>
+                </Pressable>
+              </ScrollView>
+            </View>
+          </View>
         )}
-        ListEmptyComponent={<Text style={styles.emptyText}>검색 결과가 없어요</Text>}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        // 오른쪽에 스크롤바가 보이게(2026-08-23 요청) — 기본적으로 꺼져있진 않지만 명시적으로
-        // 켜둠. persistentScrollbar는 안드로이드 전용(iOS는 무시됨)이라 안드로이드에서는 스크롤
-        // 안 하고 있을 때도 계속 보이게 함. 실제로 손가락으로 잡고 드래그하는 동작은 iOS/안드로이드
-        // 둘 다 이 얇은 기본 스크롤바를 정확히 짚으면 가능함(운영체제 기본 동작, 앱이 따로 구현한
-        // 건 아님) — 항상 두껍게 보이는 커스텀 스크롤바를 원하면 별도로 더 큰 작업이 필요함.
-        showsVerticalScrollIndicator
-        persistentScrollbar={Platform.OS === 'android'}
-      />
+      </View>
     </View>
   );
 }
@@ -524,4 +542,19 @@ const styles = StyleSheet.create({
 
   content: { padding: 20, paddingBottom: 40 },
   emptyText: { fontSize: 13, color: COLORS.inkSoft, marginTop: 8 },
+
+  // 리스트 영역(2026-08-24 추가) — FlatList가 이 View 전체 높이를 항상 그대로 차지하고,
+  // 칩 오버레이는 이 안에서 "위에 얹히는" 절대배치 레이어라서 나타나든 사라지든 FlatList
+  // 자신의 크기/위치는 절대 안 바뀜(그 위 주석 "리스트 영역" 설명 참고)
+  listWrap: { flex: 1, position: 'relative' },
+  list: { flex: 1 },
+  // 칩 3줄(카테고리/지역/정렬)을 담는 오버레이 — 배경을 명시적으로 칠해야 뒤에 있는 FlatList
+  // 카드가 안 비쳐 보임(각 줄 자체 배경색과 별개로, 혹시 비는 틈이 있어도 이걸로 다 덮임)
+  chipsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.paper,
+  },
 });
