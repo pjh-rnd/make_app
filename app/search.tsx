@@ -39,6 +39,16 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// 칩 오버레이(카테고리/지역/정렬 3줄)의 각 줄 높이 — styles의 실제 height 값과 항상 같아야 하므로
+// 여기 한 곳에서만 정의하고 styles와 FlatList 상단 여백(CHIPS_OVERLAY_HEIGHT) 둘 다 이 값을 씀.
+// (2026-08-24) 처음 오버레이로 바꿨을 때 FlatList에 이 높이만큼 상단 여백을 안 줘서, 첫 번째
+// 카드가 칩 높이 중간에 걸쳐 시작하는 바람에 위쪽이 칩에 가려지고 아래쪽만 삐져나와 "짤려”
+// 보이는 문제가 있었음(사용자 발견) — 여백을 정확히 이 높이만큼 줘서 고침.
+const CATEGORY_CHIP_ROW_HEIGHT = 64;
+const REGION_CHIP_ROW_HEIGHT = 42;
+const SORT_ROW_HEIGHT = 46;
+const CHIPS_OVERLAY_HEIGHT = CATEGORY_CHIP_ROW_HEIGHT + REGION_CHIP_ROW_HEIGHT + SORT_ROW_HEIGHT;
+
 // 예전엔 홈 화면 안에서 <Modal>로 띄웠는데, 그러면 카드를 눌러 상세 화면으로 이동할 때
 // 모달을 닫아야만 상세 화면이 안 가려져서(모달=화면 전체를 덮는 별도 레이어라 내비게이션과 무관하게
 // 항상 맨 위에 뜸) "홈 화면이 잠깐 보였다가 상세로 넘어가는" 어색한 순간이 생겼고, 뒤로 나올 때도
@@ -469,7 +479,7 @@ const styles = StyleSheet.create({
   // 높이가 갑자기 커졌다가 검색어를 지우면 다시 줄어드는 버그가 있었음 — ScrollView가 내부
   // 콘텐츠 크기를 다시 측정해서 자기 프레임을 그 크기로 부풀리는 경우가 있는 걸로 보임.
   // 그래서 바깥에 일반 View로 높이를 고정하고 overflow:hidden으로 확실히 못 벗어나게 막음
-  categoryChipWrap: { height: 64, overflow: 'hidden' },
+  categoryChipWrap: { height: CATEGORY_CHIP_ROW_HEIGHT, overflow: 'hidden' },
   categoryChipRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -479,7 +489,7 @@ const styles = StyleSheet.create({
   },
   // 지역 필터 줄(2026-08-23 추가) — sortRowWrap('#E3E1D9')보다 한 단계 연한 회색으로 둬서,
   // 카테고리 줄(흰 배경) → 지역 줄(연회색) → 정렬/필터 줄(진회색) 순서로 점점 진해지게 함.
-  regionChipWrap: { height: 42, overflow: 'hidden', backgroundColor: '#EEECE4' },
+  regionChipWrap: { height: REGION_CHIP_ROW_HEIGHT, overflow: 'hidden', backgroundColor: '#EEECE4' },
   regionChipRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -500,7 +510,7 @@ const styles = StyleSheet.create({
   // 위/아래 padding을 똑같이 줘서 칩들이 회색 영역 안에서 정확히 세로 가운데에 오게 함.
   // 배경색은 바깥 Wrap View에 줘야 칩보다 내용이 짧을 때도 줄 전체가 회색으로 채워짐
   // — contentContainerStyle(sortRow)에 배경을 주면 칩들 폭만큼만 칠해짐
-  sortRowWrap: { height: 46, overflow: 'hidden', backgroundColor: '#E3E1D9' },
+  sortRowWrap: { height: SORT_ROW_HEIGHT, overflow: 'hidden', backgroundColor: '#E3E1D9' },
   sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -540,7 +550,9 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
 
-  content: { padding: 20, paddingBottom: 40 },
+  // paddingTop은 칩 오버레이 높이(CHIPS_OVERLAY_HEIGHT)만큼 항상 고정으로 확보해둠 — 칩이
+  // 보이든 안 보이든 이 여백은 안 바뀌어야 함(그래야 리스트/카드 위치가 안 흔들림, 위 주석 참고)
+  content: { paddingTop: 20 + CHIPS_OVERLAY_HEIGHT, paddingHorizontal: 20, paddingBottom: 40 },
   emptyText: { fontSize: 13, color: COLORS.inkSoft, marginTop: 8 },
 
   // 리스트 영역(2026-08-24 추가) — FlatList가 이 View 전체 높이를 항상 그대로 차지하고,
