@@ -31,6 +31,11 @@ export type Requirements = {
   requiresJobSeeker?: boolean; // 취업요건이 "미취업자"만 단독으로 걸린 경우만 true
   requiresBasicLivelihoodRecipient?: boolean; // 특화요건에 "기초생활수급자"가 포함된 경우
   requiresSingleParentFamily?: boolean; // 특화요건에 "한부모가정"이 포함된 경우
+  // 2026-08-24 추가 — "1인 가구만" 대상인 정책. 온통청년 API엔 가구원수 조건 전용 코드가 없고,
+  // "가구원 수" 텍스트가 나와도 대부분은 자격조건이 아니라 혜택 금액 차등(예: "1인가구 20만원,
+  // 2인이상 25만원")이나 가구원 산정 방법 설명이라, 정규식 자동화 대신 원문을 직접 읽고 확실히
+  // "1인 가구"라고 못박은 정책 3건만 scripts/syncYouthPolicies.js에서 수동으로 지정함.
+  requiresSingleHousehold?: boolean;
 };
 
 export type MatchCriterion = { label: string; met: boolean };
@@ -147,6 +152,13 @@ export function calculateMatch(profile: Profile | null, requirements: Requiremen
     criteria.push({
       label: '한부모가정',
       met: profile?.is_supported_single_parent_family === true,
+    });
+  }
+
+  if (requirements.requiresSingleHousehold) {
+    criteria.push({
+      label: '1인 가구',
+      met: profile?.family_member_count === 1,
     });
   }
 

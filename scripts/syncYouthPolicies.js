@@ -383,6 +383,21 @@ function resolveNoHouseRequirement(item) {
   return NO_HOUSE_RE.test(text) ? { requiresNoHouse: true } : {};
 }
 
+// "1인 가구만" 대상인 정책(2026-08-24 추가) — "가구원 수"/"N인 가구" 텍스트가 나오는 정책 8건을
+// 직접 다 읽어봤는데, 6건은 자격조건이 아니었음(예: "1인가구 20만원, 2인이상 25만원"처럼 혜택
+// 금액만 다르거나, "가구원 수 산정 방법"을 설명하는 문장이었음) — 정규식으로 자동화하면 이런
+// 케이스를 잘못 걸러낼 위험이 커서, 원문에서 "1인 가구"라고 명확히 못박은 정책 3건만 ID로 직접
+// 지정함(자동화 아님 — 나중에 재동기화할 때마다 이 목록은 그대로 유지됨).
+const SINGLE_HOUSEHOLD_ONLY_IDS = new Set([
+  '20260408005400212608', // 2026년 서구 전입 청년 웰컴 박스 지원
+  '20260326005400212288', // 2026년 평택시 청년 전월세 중개보수료 감면사업
+  '20260318005400212193', // 청년 1인가구 전월세 안심계약 지원
+]);
+
+function resolveSingleHouseholdRequirement(item) {
+  return SINGLE_HOUSEHOLD_ONLY_IDS.has(item.plcyNo) ? { requiresSingleHousehold: true } : {};
+}
+
 // 연령 조건 버그 수정(2026-08-24, 사용자가 "만 40세로 넣었는데 만 39세 조건 정책도 지원
 // 가능이라고 뜬다"고 지적해서 발견) — 예전엔 sprtTrgtAgeLmtYn(연령제한여부)이 'Y'일 때만
 // sprtTrgtMaxAge를 반영했는데, 실측해보니 이 플래그가 전혀 안 믿을만했음:
@@ -414,6 +429,7 @@ function resolveRequirements(item) {
   Object.assign(requirements, resolveStatusRequirements(item));
   Object.assign(requirements, resolveIncomeRequirement(item));
   Object.assign(requirements, resolveNoHouseRequirement(item));
+  Object.assign(requirements, resolveSingleHouseholdRequirement(item));
   return requirements;
 }
 
