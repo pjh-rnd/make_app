@@ -129,7 +129,7 @@
   스키마 변경 없이 콤마로 join한 여러 id를 저장하는 방식(`packIds`/`unpackIds` 헬퍼,
   `lib/useSavedPolicies.ts`)으로 확장함.
 
-### 6. 소셜 로그인 (카카오/네이버/구글) — **스캐폴딩만, 아직 실제로 안 됨**
+### 6. 소셜 로그인 (카카오/네이버/구글) — **2026-08-24 완료, 웹으로 로그인 성공 확인됨**
 
 - `app/login.tsx` 하단에 "간편로그인" 섹션 추가: 원형 카카오/네이버/구글 아이콘
   (`components/social-icon.tsx`, 이미지 없이 View/Text로 그림 — 구글은 흰 배경+옅은 테두리+파란
@@ -741,13 +741,23 @@ GitHub Actions 같은 걸로 매일 자동 실행되게 만드는 게 다음 작
     "로그아웃 리다이렉트 URI"에 잘못 등록했었음(로그인용이 아님) — 최신 카카오 UI에서는 로그인용
     Redirect URI 등록 위치가 "카카오 로그인" 메뉴가 아니라 **[앱] > [플랫폼 키]**로 옮겨가 있었음.
     거기 등록하고 나서야 로그인 성공.
-- [ ] **네이버(셋 중 제일 번거로움, 2026-08-24 현재 아직 진행 중)**: Supabase가 네이버를 기본
-  provider로 안 갖고 있어서 "Custom OIDC provider"로 등록해야 함 → [네이버 개발자센터](https://developers.naver.com/)에서
-  애플리케이션 등록(네이버 로그인 API 사용 설정, Callback URL에 Supabase 콜백 주소 등록) →
-  Client ID/Secret 발급 → Supabase 대시보드(Authentication → Providers → Custom OIDC, 이름을
-  정확히 "naver"로) 등록.
-  이 외부 콘솔 작업들은 로그인/가입이 필요해서 내가 대신 해줄 수 없음 — `lib/socialAuth.ts`
-  주석에도 같은 절차가 요약돼 있음.
+- [x] ~~네이버 개발자센터 앱 등록 + Supabase Custom Provider 설정~~ — 2026-08-24, 완료.
+  **소셜 로그인 3종(카카오/네이버/구글) 전부 웹 테스트로 로그인 성공까지 확인 완료.**
+  네이버는 Supabase가 기본 provider로 안 갖고 있어서(OIDC 표준을 지원 안 하는 provider라
+  "Auto-discovery"가 아니라 **"Manual configuration"**으로 등록해야 함) 아래처럼 설정함:
+  - Provider Identifier: `naver` (코드에서는 `custom:naver`로 참조 — SDK가 자동으로 `custom:`
+    접두사를 붙이는 방식)
+  - Authorization URL: `https://nid.naver.com/oauth2.0/authorize`
+  - Token URL: `https://nid.naver.com/oauth2.0/token`
+  - Userinfo URL: `https://openapi.naver.com/v1/nid/me`
+  - Issuer URL: 실제로 discovery를 하는 게 아니라 형식 검증(유효한 URL인지)만 하는 필수 칸이라,
+    네이버 로그인 서버 기본 주소(`https://nid.naver.com`)를 그냥 채워 넣음
+  - JWKS URI: 비워둠 — 네이버는 ID 토큰(JWT)을 안 주는 순수 OAuth2 방식이라 불필요("ID 토큰
+    검증용"이라고 안내돼 있는 칸이라 ID 토큰이 없으면 필요 없음), 비워도 저장/로그인 정상 동작함
+  - Callback URL은 카카오/구글과 동일하게 Supabase 프로젝트 공용 콜백 주소를 그대로 씀, 네이버
+    애플리케이션 설정의 Callback URL도 그 값으로 등록.
+  이 외부 콘솔 작업들은 로그인/가입이 필요해서 내가 대신 해줄 수 없어서 사용자가 직접 진행함
+  (Google Cloud Console, Kakao Developers, 네이버 개발자센터, Supabase 대시보드 각각).
 - [ ] 회원탈퇴 시 실제 Supabase Auth 계정 삭제 — Edge Function(admin API) 필요, 지금은 프로필/찜
   데이터만 지우고 로그아웃함.
 - [ ] "내가 지원한 공고"/커뮤니티(내가 쓴 글/댓글) — 전부 UI만 있고 "준비 중" placeholder.
