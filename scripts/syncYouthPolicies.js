@@ -103,10 +103,27 @@ function parseAplyYmd(aplyYmd) {
   return { start, end };
 }
 
+// 온통청년 API의 aplyYmd가 실제 공식 발표와 다른 것으로 확인된 정책들을 정책 ID로 직접 지정해서
+// 덮어씀(2026-08-24 추가) — "부산 대학생 학자금 대출이자 지원"을 사용자가 재확인 요청해서 부산시
+// 청년플랫폼 공식 페이지 + 여러 뉴스 기사로 대조해보니, API는 신청기간을 "20260701 ~ 20260831"로
+// 주는데 실제 공식 신청기간은 "2026.7.6.(월) ~ 2026.8.28.(금)"이었음(시작 5일 늦고, 마감은 3일
+// 빠름 — 특히 마감을 실제보다 늦게 보여주면 사용자가 진짜 마감을 놓칠 수 있어서 위험함). 이런
+// 사례를 발견할 때마다 여기 추가함 — 자동으로 감지할 방법이 없어서(API 자체가 틀린 값을 구조화된
+// 형태로 주는 경우라 텍스트 패턴으로도 못 잡음) 사람이 직접 원문 대조로 확인한 것만 등록함.
+const MANUAL_DATE_OVERRIDES = {
+  // 부산 대학생 학자금 대출이자 지원 — https://young.busan.go.kr/index.nm?menuCd=49 (2026-08-24 확인)
+  '20260430005400212951': { start: '2026-07-06', end: '2026-08-28' },
+};
+
 // 신청 기간(startDate/deadlineDate) 결정 — aplyYmd 우선, 없으면 bizPrdBgngYmd/EndYmd로 대체
 // 시도. 그래도 없거나(연중/상시모집) 앞뒤가 뒤집혀있으면(데이터 이상) is_rolling=true로 표시하고
 // 날짜는 null로 둠 — 캘린더엔 안 찍히지만 목록에서는 "상시모집" 배지로 계속 보이게 함(app 쪽에서 처리).
 function resolveDates(item) {
+  const override = MANUAL_DATE_OVERRIDES[item.plcyNo];
+  if (override) {
+    return { startDate: override.start, deadlineDate: override.end, isRolling: false };
+  }
+
   let start = null;
   let end = null;
 
