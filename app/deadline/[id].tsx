@@ -271,12 +271,19 @@ export default function DeadlineDetailScreen() {
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionLabel}>
-          내 조건으로 {match.eligible ? '신청 가능해요' : '신청할 수 없어요'}
-        </Text>
+        {/* 소제목을 판정 결과 문장("신청 가능해요"/"신청할 수 없어요")이 아니라 중립적인
+            "지원 조건"으로 바꾸고, 전체 판정 결과는 옆에 배지로 따로 둠(2026-08-24 요청) —
+            그 아래 각 조건은 충족/미충족을 ○/✕로 하나하나 보여줘서, "어떤 조건 때문에 이렇게
+            판정됐는지"가 한눈에 보이게 함. */}
+        <View style={styles.criteriaHeaderRow}>
+          <Text style={[styles.sectionLabel, styles.criteriaHeaderLabel]}>지원 조건</Text>
+          <Text style={[styles.eligibleBadge, !match.eligible && styles.eligibleBadgeFail]}>
+            {match.eligible ? '지원 가능' : '조건 미충족'}
+          </Text>
+        </View>
         {match.criteria.map((c) => (
           <Text key={c.label} style={[styles.criterion, c.met ? styles.criterionMet : styles.criterionUnmet]}>
-            {c.met ? '✓' : '✗'} {c.label}
+            {c.met ? '○' : '✕'} {c.label}
           </Text>
         ))}
 
@@ -539,6 +546,17 @@ const styles = StyleSheet.create({
   subLabelSpaced: { marginTop: 17 },
   detail: { fontSize: 19, color: COLORS.ink, lineHeight: 29 },
   bulletLine: { fontSize: 18, color: COLORS.ink, lineHeight: 26, marginTop: 5 },
+  // "지원 조건" 소제목 옆 전체 판정 배지(2026-08-24 추가) — deadline-card.tsx의 matchBadge와
+  // 같은 색 규칙(충족: mint, 미충족: inkSoft)을 그대로 씀
+  criteriaHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  criteriaHeaderLabel: { marginBottom: 0 }, // 위 criteriaHeaderRow가 이미 marginBottom을 담당함
+  eligibleBadge: { fontSize: 15, fontWeight: '700', color: COLORS.mint },
+  eligibleBadgeFail: { color: COLORS.inkSoft },
   criterion: { fontSize: 19, marginTop: 8, lineHeight: 25 },
   criterionMet: { color: COLORS.mint },
   criterionUnmet: { color: COLORS.coral },

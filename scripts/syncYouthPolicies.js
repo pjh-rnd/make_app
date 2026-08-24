@@ -366,11 +366,26 @@ function resolveIncomeRequirement(item) {
   return requirements;
 }
 
+// 연령 조건 버그 수정(2026-08-24, 사용자가 "만 40세로 넣었는데 만 39세 조건 정책도 지원
+// 가능이라고 뜬다"고 지적해서 발견) — 예전엔 sprtTrgtAgeLmtYn(연령제한여부)이 'Y'일 때만
+// sprtTrgtMaxAge를 반영했는데, 실측해보니 이 플래그가 전혀 안 믿을만했음:
+//   - limYn='N'인데 실제 나이값(19~39세 등)이 있는 정책이 167건(!)
+//   - limYn='Y'인데 나이값이 아예 없는(0) 정책도 113건
+// 즉 플래그와 실제 나이값 존재 여부가 거의 무관함 — 플래그 대신 나이값 자체의 유효성만 보고
+// 판단하는 걸로 바꿈. sprtTrgtMaxAge 분포를 실측해보니 "0"(값 없음, 130건)과 진짜 나이값들
+// (39/45/34/49 등)은 명확히 구분되고, 100은 "사실상 상한 없음" 취급으로 봐도 무방해서(실제로
+// 누군가의 자격을 부당하게 제한하지 않음) 100 미만만 진짜 상한으로 반영함.
+// sprtTrgtMinAge(하한)도 같은 방식으로 추가함 — 10대만 대상인 정책(예: 청소년 대상 사업)에서
+// 성인이 "지원 가능"으로 잘못 뜨는 문제도 같이 해결됨.
 function resolveRequirements(item) {
   const requirements = {};
   const maxAge = parseInt(item.sprtTrgtMaxAge, 10);
-  if (item.sprtTrgtAgeLmtYn === 'Y' && Number.isFinite(maxAge) && maxAge > 0) {
+  if (Number.isFinite(maxAge) && maxAge > 0 && maxAge < 100) {
     requirements.maxAge = maxAge;
+  }
+  const minAge = parseInt(item.sprtTrgtMinAge, 10);
+  if (Number.isFinite(minAge) && minAge > 0 && (requirements.maxAge == null || minAge < requirements.maxAge)) {
+    requirements.minAge = minAge;
   }
   const { keyword: regionKeyword, province: regionProvince } = resolveRegion(item);
   if (regionKeyword) {

@@ -2,6 +2,9 @@ import { calculateAge, type Profile } from '@/lib/useProfile';
 
 export type Requirements = {
   maxAge?: number;
+  // 2026-08-24 추가 — sprtTrgtMinAge 기반. 10대만 대상인 정책 등에서 최소 연령 조건도 판정해야
+  // "지원 가능" 오판을 막을 수 있어서 추가함(scripts/syncYouthPolicies.js resolveRequirements 참고)
+  minAge?: number;
   maxPersonalMonthlyIncome?: number; // 만원 단위, 개인 월 소득 상한
   maxHouseholdMonthlyIncome?: number; // 만원 단위, 가구 월 소득 상한
   // 아래 2개는 2026-08-23 추가 — 온통청년 원본 데이터가 소득 조건을 "연소득" 단위로 주는데
@@ -55,6 +58,14 @@ export function calculateMatch(profile: Profile | null, requirements: Requiremen
     criteria.push({
       label: `만 ${requirements.maxAge}세 이하`,
       met: age != null && age <= requirements.maxAge,
+    });
+  }
+
+  if (requirements.minAge != null) {
+    const age = calculateAge(profile?.birth_date);
+    criteria.push({
+      label: `만 ${requirements.minAge}세 이상`,
+      met: age != null && age >= requirements.minAge,
     });
   }
 
