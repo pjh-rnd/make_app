@@ -262,11 +262,13 @@ export default function SearchScreen() {
       <Text style={styles.resultCount}>총 {sortedSearchResults.length}건</Text>
 
       {/* scripts/syncYouthPolicies.js가 온통청년 API에서 데이터를 가져올 때 이미 이 기간
-          기준으로 걸러서 Supabase에 저장하기 때문에(너무 많아서), 검색해도 이 범위 밖의 공고는
-          애초에 목록에 없음 — 사용자가 "왜 이것밖에 안 나오지?" 헷갈리지 않게 안내해둠 */}
-      <Text style={styles.syncWindowHint}>
-        마감 2주 이내 · 시작 1달 이내인 공고만 모아봤어요
-      </Text>
+          (START_WINDOW_DAYS_AHEAD/CLOSED_WINDOW_DAYS_BEHIND) 기준으로 걸러서 Supabase에
+          저장하기 때문에(너무 많아서), 검색해도 이 범위 밖의 공고는 애초에 목록에 없음 —
+          사용자가 "왜 이것밖에 안 나오지?" 헷갈리지 않게 안내해둠. 2026-08-25: 문구에 "2주"/
+          "1달" 같은 구체적 일수를 박아놓으면 저 스크립트의 실제 값이 바뀔 때마다 같이 안
+          바꿔서 어긋나는 문제가 있었음(실제로 이번에 그랬음) — 그래서 숫자 없이 짧고
+          센스있는 문구로 바꿈, 값이 바뀌어도 다시 어긋날 일 없음 */}
+      <Text style={styles.syncWindowHint}>지금 챙겨야 할 공고만 모았어요</Text>
 
       {/* 리스트 영역(2026-08-24 재구성) — 예전엔 칩 3줄(chipsVisible)이 FlatList "위"의 평범한
           형제 요소라서, 칩이 사라지면 그 밑 형제들(FlatList 포함)이 전부 그 빈자리로 끌어올려져서
